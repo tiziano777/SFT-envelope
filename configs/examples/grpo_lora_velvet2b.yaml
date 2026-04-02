@@ -1,0 +1,50 @@
+# GRPO + LoRA su Almawave/Velvet-2B
+# Dataset: openai/gsm8k (math reasoning)
+# Framework: TRL
+
+experiment:
+  name: "grpo-lora-velvet2b-math"
+  description: "GRPO with LoRA on Almawave/Velvet-2B for math reasoning"
+  tags: ["grpo", "lora", "velvet", "math"]
+
+model:
+  name_or_path: "Almawave/Velvet-2B"
+  trust_remote_code: true
+  max_seq_length: 2048
+
+training:
+  technique: "grpo"
+  peft:
+    method: "lora"
+    r: 16
+    lora_alpha: 32
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  precision:
+    compute_dtype: "bf16"
+  technique_args:
+    num_generations: 8
+    max_completion_length: 512
+    epsilon: 0.2
+    beta: 0.04
+    temperature: 1.0
+
+dataset:
+  train_uri: "openai/gsm8k"
+  subset: "main"
+  format: "rl"
+  prompt_field: "question"
+  max_samples: 5000
+
+reward:
+  type: "verifiable"
+  functions:
+    - name: "math_correctness"
+      module_path: "rewards.math_verify"
+      weight: 1.0
+
+hardware:
+  gpu_type: "A100-80GB"
+  gpu_count: 1
+
+framework:
+  backend: "trl"

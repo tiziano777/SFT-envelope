@@ -1,0 +1,55 @@
+# DPO + QLoRA on Qwen2.5-7B via Unsloth
+# Reference implementation for FineTuning-Envelope
+
+experiment:
+  name: "dpo-qlora-qwen-unsloth"
+  description: "DPO with QLoRA via Unsloth on Qwen2.5-7B-Instruct for preference alignment"
+  tags: ["dpo", "qlora", "preference", "unsloth"]
+  seed: 42
+
+model:
+  name_or_path: "Qwen/Qwen2.5-7B-Instruct"
+  trust_remote_code: true
+  max_seq_length: 2048
+
+training:
+  technique: "dpo"
+  peft:
+    method: "qlora"
+    r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  precision:
+    compute_dtype: "bf16"
+    quantization: "nf4"
+    double_quantization: true
+  technique_args:
+    beta: 0.1
+    dpo_variant: "standard"
+
+dataset:
+  train_uri: "argilla/dpo-mix-7k"
+  split_train: "train"
+  format: "preference"
+  prompt_field: "prompt"
+  chosen_field: "chosen"
+  rejected_field: "rejected"
+  max_samples: 5000
+
+hardware:
+  gpu_type: "A100-80GB"
+  gpu_count: 1
+
+optimization:
+  gradient_checkpointing: true
+
+framework:
+  backend: "unsloth"
+
+output:
+  dir: "./output"
+  logging_steps: 10
+  save_strategy: "steps"
+  save_steps: 500
+  report_to: ["tensorboard"]

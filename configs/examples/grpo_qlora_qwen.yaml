@@ -1,0 +1,70 @@
+# GRPO + QLoRA on Qwen2.5-7B for math reasoning
+# Reference implementation for FineTuning-Envelope
+
+experiment:
+  name: "grpo-qlora-qwen-math"
+  description: "GRPO with QLoRA on Qwen2.5-7B-Instruct for mathematical reasoning"
+  tags: ["grpo", "qlora", "math", "qwen"]
+  seed: 42
+
+model:
+  name_or_path: "Qwen/Qwen2.5-7B-Instruct"
+  trust_remote_code: true
+  attn_implementation: "flash_attention_2"
+  max_seq_length: 2048
+
+training:
+  technique: "grpo"
+  peft:
+    method: "qlora"
+    r: 32
+    lora_alpha: 64
+    lora_dropout: 0.05
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  precision:
+    compute_dtype: "bf16"
+    quantization: "nf4"
+    double_quantization: true
+  technique_args:
+    num_generations: 16
+    max_completion_length: 512
+    epsilon: 0.2
+    beta: 0.04
+    temperature: 1.0
+
+dataset:
+  train_uri: "argilla/magpie-ultra-v1.0"
+  split_train: "train"
+  format: "rl"
+  prompt_field: "prompt"
+  max_samples: 10000
+
+reward:
+  type: "verifiable"
+  functions:
+    - name: "math_correctness"
+      module_path: "rewards.math_verify"
+      weight: 1.0
+    - name: "format_check"
+      module_path: "rewards.format_regex"
+      weight: 0.1
+      args:
+        pattern: "<think>.*</think>\\s*<answer>.*</answer>"
+
+hardware:
+  gpu_type: "A100-80GB"
+  gpu_count: 1
+
+optimization:
+  flash_attention: "v2"
+  gradient_checkpointing: true
+
+framework:
+  backend: "trl"
+
+output:
+  dir: "./output"
+  logging_steps: 10
+  save_strategy: "steps"
+  save_steps: 500
+  report_to: ["tensorboard"]

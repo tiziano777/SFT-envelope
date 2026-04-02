@@ -1,0 +1,112 @@
+experiment:
+  name: grpo-lora-velvet2b-math
+  description: GRPO with LoRA on Almawave/Velvet-2B for math reasoning
+  tags:
+  - grpo
+  - lora
+  - velvet
+  - math
+  seed: 42
+model:
+  name_or_path: Almawave/Velvet-2B
+  revision: main
+  trust_remote_code: true
+  attn_implementation: flash_attention_2
+  max_seq_length: 2048
+training:
+  stage: 3
+  technique: grpo
+  peft:
+    method: lora
+    r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    bias: none
+    task_type: CAUSAL_LM
+    use_dora: false
+    use_rslora: false
+  precision:
+    compute_dtype: bf16
+    quantization: none
+    double_quantization: false
+    quantization_type: nf4
+  technique_args:
+    num_generations: 8
+    max_completion_length: 512
+    epsilon: 0.2
+    beta: 0.04
+    temperature: 1.0
+    num_iterations: 1
+    scale_rewards: group
+dataset:
+  train_uri: openai/gsm8k
+  subset: main
+  split_train: train
+  split_eval: test
+  format: rl
+  prompt_field: question
+  chosen_field: chosen
+  rejected_field: rejected
+  max_samples: 5000
+  prepare:
+    cache_dir: ./data_cache
+    num_proc: 4
+reward:
+  type: verifiable
+  functions:
+  - name: math_correctness
+    module_path: rewards.math_verify
+    weight: 1.0
+    args: {}
+reference_model:
+  enabled: true
+  share_layers: true
+hardware:
+  gpu_type: A100-80GB
+  gpu_count: 1
+  num_nodes: 1
+  cpu_per_gpu: 8
+  remote:
+    enabled: false
+    backend: ssh
+optimization:
+  flash_attention: v2
+  gradient_checkpointing: true
+  gradient_checkpointing_mode: full
+  sequence_packing: false
+  compile_model: false
+  fused_optimizers: true
+  vllm_rollout: false
+  vllm_mode: colocate
+  vllm_gpu_memory_utilization: 0.9
+  fsdp:
+    enabled: false
+    sharding_strategy: full_shard
+    auto_wrap_policy: transformer_based
+    min_num_params: 1000000
+    cpu_offload: false
+    mixed_precision: none
+    forward_prefetch: true
+    backward_prefetch: backward_pre
+    sync_module_states: true
+    use_orig_params: true
+    limit_all_gathers: true
+    activation_checkpointing: false
+framework:
+  backend: trl
+  custom_args: {}
+  triton_kernels: []
+output:
+  dir: ./output
+  logging_steps: 10
+  save_strategy: steps
+  save_steps: 500
+  save_total_limit: 3
+  report_to:
+  - tensorboard
+  push_to_hub: false

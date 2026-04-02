@@ -1,0 +1,44 @@
+# SFT + LoRA on Llama 3.1 8B
+# Basic supervised fine-tuning example
+
+experiment:
+  name: "sft-lora-llama3"
+  description: "SFT with LoRA on Meta-Llama-3.1-8B-Instruct"
+  tags: ["sft", "lora", "llama3"]
+  seed: 42
+
+model:
+  name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+  attn_implementation: "flash_attention_2"
+  max_seq_length: 4096
+
+training:
+  technique: "sft"
+  peft:
+    method: "lora"
+    r: 16
+    lora_alpha: 32
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  precision:
+    compute_dtype: "bf16"
+
+dataset:
+  train_uri: "tatsu-lab/alpaca"
+  split_train: "train"
+  format: "instruction"
+
+hardware:
+  gpu_type: "RTX4090"
+  gpu_count: 1
+
+optimization:
+  flash_attention: "v2"
+  gradient_checkpointing: true
+  sequence_packing: true
+
+framework:
+  backend: "trl"
+
+output:
+  dir: "./output"
+  report_to: ["tensorboard"]

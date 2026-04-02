@@ -1,0 +1,38 @@
+# Reward Model Training via TRL
+# Trains a scalar reward model from preference data (chosen/rejected pairs).
+# Uses AutoModelForSequenceClassification with num_labels=1.
+
+experiment:
+  name: "reward-model-qwen"
+  description: "Reward model training on UltraFeedback"
+  tags: ["reward_modeling", "lora"]
+
+model:
+  name_or_path: "Qwen/Qwen2.5-1.5B-Instruct"
+  trust_remote_code: true
+  max_seq_length: 2048
+
+training:
+  technique: "reward_modeling"
+  peft:
+    method: "lora"
+    r: 16
+    lora_alpha: 32
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  precision:
+    compute_dtype: "bf16"
+  technique_args:
+    center_rewards_coefficient: 0.01
+
+dataset:
+  train_uri: "trl-lib/ultrafeedback_binarized"
+  format: "preference"
+  chosen_field: "chosen"
+  rejected_field: "rejected"
+
+hardware:
+  gpu_type: "A100-80GB"
+  gpu_count: 1
+
+framework:
+  backend: "trl"

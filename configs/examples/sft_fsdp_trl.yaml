@@ -1,0 +1,51 @@
+# Example: SFT with FSDP on 4x A100-80GB via TRL
+# This configuration demonstrates multi-GPU training with FSDP sharding.
+
+experiment:
+  name: "sft-fsdp-llama3"
+  description: "SFT with LoRA on Llama-3.1-8B using FSDP across 4 GPUs"
+  tags: ["sft", "fsdp", "lora", "multi-gpu"]
+
+model:
+  name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+  max_seq_length: 2048
+
+training:
+  technique: "sft"
+  peft:
+    method: "lora"
+    r: 16
+    lora_alpha: 32
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  precision:
+    compute_dtype: "bf16"
+
+dataset:
+  train_uri: "tatsu-lab/alpaca"
+  format: "instruction"
+
+hardware:
+  gpu_type: "A100-80GB"
+  gpu_count: 4
+
+optimization:
+  flash_attention: "v2"
+  gradient_checkpointing: true
+  fsdp:
+    enabled: true
+    sharding_strategy: "full_shard"
+    auto_wrap_policy: "transformer_based"
+    cpu_offload: false
+    sync_module_states: true
+    use_orig_params: true
+    activation_checkpointing: false
+
+framework:
+  backend: "trl"
+
+output:
+  dir: "./output"
+  logging_steps: 10
+  save_strategy: "steps"
+  save_steps: 500
+  report_to: ["tensorboard"]

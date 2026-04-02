@@ -1,0 +1,42 @@
+# GKD (Generalized Knowledge Distillation) via TRL
+# Distills knowledge from a large teacher model to a smaller student model.
+
+experiment:
+  name: "gkd-llama-distill"
+  description: "GKD distillation from Llama-3.1-8B to Llama-3.2-1B"
+  tags: ["gkd", "distillation", "lora"]
+
+model:
+  name_or_path: "meta-llama/Llama-3.2-1B-Instruct"
+  trust_remote_code: false
+  max_seq_length: 2048
+
+teacher_model:
+  name_or_path: "meta-llama/Llama-3.1-8B-Instruct"
+
+training:
+  technique: "gkd"
+  peft:
+    method: "lora"
+    r: 16
+    lora_alpha: 32
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  precision:
+    compute_dtype: "bf16"
+  technique_args:
+    temperature: 0.9
+    lmbda: 0.5
+    beta: 0.5
+    max_new_tokens: 128
+    disable_dropout: true
+
+dataset:
+  train_uri: "trl-lib/Capybara"
+  format: "chat"
+
+hardware:
+  gpu_type: "A100-80GB"
+  gpu_count: 1
+
+framework:
+  backend: "trl"

@@ -1,0 +1,64 @@
+# GRPO from scratch (raw PyTorch) on Qwen2.5-7B for math reasoning
+# Uses the from_scratch framework with ABC class hierarchy
+
+experiment:
+  name: "grpo-fromscratch-qwen-math"
+  description: "GRPO from scratch with raw PyTorch on Qwen2.5-7B-Instruct"
+  tags: ["grpo", "from_scratch", "math", "qwen"]
+  seed: 42
+
+model:
+  name_or_path: "Qwen/Qwen2.5-7B-Instruct"
+  trust_remote_code: true
+  attn_implementation: "flash_attention_2"
+  max_seq_length: 2048
+
+training:
+  technique: "grpo"
+  peft:
+    method: "lora"
+    r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+  precision:
+    compute_dtype: "bf16"
+  technique_args:
+    num_generations: 16
+    max_completion_length: 512
+    epsilon: 0.2
+    beta: 0.04
+    temperature: 1.0
+
+dataset:
+  train_uri: "argilla/magpie-ultra-v1.0"
+  split_train: "train"
+  format: "rl"
+  prompt_field: "prompt"
+  max_samples: 10000
+
+reward:
+  type: "verifiable"
+  functions:
+    - name: "math_correctness"
+      module_path: "rewards.math_verify"
+      weight: 1.0
+
+hardware:
+  gpu_type: "A100-80GB"
+  gpu_count: 1
+
+optimization:
+  flash_attention: "v2"
+  gradient_checkpointing: true
+
+framework:
+  backend: "from_scratch"
+  triton_kernels: ["cross_entropy", "rms_norm"]
+
+output:
+  dir: "./output"
+  logging_steps: 10
+  save_strategy: "steps"
+  save_steps: 500
+  report_to: ["tensorboard"]
