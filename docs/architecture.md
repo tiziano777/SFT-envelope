@@ -34,7 +34,7 @@ FineTuning-Envelope e' un sistema di generazione setup per il fine-tuning di mod
 
 ### Punti di integrazione esterna
 
-I setup generati supportano un protocollo standard per l'integrazione con tool esterni (orchestratori di sweep, script di automazione, pipeline CI/CD):
+I setup generati supportano un protocollo standard per l'integrazione con tool esterni (orchestratori, script di automazione, pipeline CI/CD):
 
 - **Input -- variabili d'ambiente `HPARAM_*`**: qualsiasi tool esterno puo' iniettare override di iperparametri a runtime settando variabili d'ambiente con prefisso `HPARAM_`. Il `train.py` generato le legge e sovrascrive i valori di default.
 - **Output -- `EXPERIMENT_RESULT:{json}` su stdout**: al termine del training, lo script emette una riga strutturata con le metriche dell'esperimento. Qualsiasi tool di orchestrazione puo' parsare questa riga per raccogliere risultati.
@@ -53,7 +53,7 @@ Tecniche e framework sono plugin registrati tramite un decoratore `@registry.reg
 
 ### D3: Protocollo HPARAM per tool esterni
 
-I setup generati espongono un'interfaccia standard basata su variabili d'ambiente (`HPARAM_*`) e output strutturato (`EXPERIMENT_RESULT:{json}`). Questo permette a qualsiasi tool esterno -- orchestratori di sweep, agent di ricerca, pipeline CI/CD -- di interagire con i setup senza conoscere i dettagli interni del training script.
+I setup generati espongono un'interfaccia standard basata su variabili d'ambiente (`HPARAM_*`) e output strutturato (`EXPERIMENT_RESULT:{json}`). Questo permette di interagire con i setup senza conoscere i dettagli interni del training script.
 
 ### D4: Immutabilita' dei setup
 

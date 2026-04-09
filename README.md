@@ -187,7 +187,7 @@ make format                                            # Formattazione
 
 ## Integrazione esterna
 
-I setup generati espongono un protocollo standard che consente a tool esterni (sweep engine, coding agent, script custom) di sovrascrivere iperparametri e leggere i risultati.
+I setup generati espongono un protocollo standard che consente di sovrascrivere iperparametri e leggere i risultati.
 
 **Override iperparametri**: `train.py` legge variabili d'ambiente `HPARAM_*` a runtime. Qualunque iperparametro nel config puo' essere sovrascritto:
 
