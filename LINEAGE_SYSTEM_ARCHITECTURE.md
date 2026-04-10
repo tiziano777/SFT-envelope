@@ -772,8 +772,7 @@ class ExperimentRepository:
         """Crea nuovo ckp + N relazioni MERGED_FROM."""
 
     def find_experiment_by_hashes(self,
-        config_hash: str, hyperparams_hash: str,
-        req_hash: str, code_hash: str) -> Optional[ExperimentNode]: ...
+        config_hash: str, req_hash: str, code_hash: str) -> Optional[ExperimentNode]: ...
 
     def get_latest_checkpoint(self, exp_id: str) -> Optional[CheckpointNode]: ...
 
@@ -788,8 +787,7 @@ class LineageController:
 
     def process_handshake(self, req: HandshakeRequest) -> HandshakeResponse:
         existing = repo.find_experiment_by_hashes(
-            req.config_hash, req.hyperparams_hash,
-            req.req_hash, req.code_hash
+            req.config_hash, req.req_hash, req.code_hash
         )
 
         # RESUME: hash identico + stesso ultimo checkpoint
@@ -938,7 +936,7 @@ Il layer di trasporto è astratto da `BaseConnection`. La logica dei messaggi (c
 
 Unica fase bloccante del sistema. Il Worker non inizia il training finché non riceve `HandshakeResponse`.
 
-1. Worker calcola i 4 hash (`config`, `hyperparams`, `requirements`, `committed_code`).
+1. Worker calcola i 3 hash (`config`, `requirements`, `code`).
 2. Worker invia `HandshakeRequest` al Master.
 3. Master esegue `LineageController.process_handshake()`.
 4. Master risponde con `HandshakeResponse` (exp_id + strategy).
@@ -1032,7 +1030,7 @@ datamix:
         - p2
       dist_id: UUID
       dist_uri: ...
-      schema_temnplate: ...
+      schema_template: ...
 ```
 Semantica di replica: il dataset viene campionato replica volte nel mix. Un dataset con replica: 3 contribuisce al triplo dei sample rispetto a uno con replica: 1.
 
