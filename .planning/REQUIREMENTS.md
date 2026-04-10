@@ -153,19 +153,19 @@ Requirements for the lineage system milestone. Each maps to roadmap phases.
 | DB-01..08 | Phase 2 | Pending |
 | OBSV-01..05 | Phase 3 | Pending |
 | MAPI-01..10 | Phase 4 | Pending |
+| INFR-01..05 | Phase 4 | Pending |
 | STOR-01..05 | Phase 5 | Pending |
 | WRKR-01..10 | Phase 6 | Pending |
 | GENR-01..05 | Phase 7 | Pending |
 | DMIX-01..04 | Phase 8 | Pending |
 | TEST-01..08 | Phase 9 | Pending |
-| INFR-01..05 | Phase 4 | Pending |
 | DOCS-01..04 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 72 total
-- Mapped to phases: 72
+- v1 requirements: 73 total
+- Mapped to phases: 73
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-10*
-*Last updated: 2026-04-10 after initial definition*
+*Last updated: 2026-04-10 after roadmap phase mapping*
