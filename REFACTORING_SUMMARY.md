@@ -126,18 +126,21 @@ defaults = technique_obj.default_technique_args()  # Single source
 
 ## ⏳ Remaining Work (Priority Order)
 
-### High Priority (Dependent on current work)
-- [ ] **FASE 2.2**: Consolida template_context() in BaseFrameworkAdapter (192 righe boilerplate)
-- [ ] **FASE 2.3**: Genera 5 template mancanti (TorchTune, Axolotl, LlamaFactory, veRL, OpenRLHF)
+### ✅ COMPLETED in Session 2
+- ✅ **FASE 2.2**: Consolida template_context() in BaseFrameworkAdapter (192 righe removed)
+- ✅ **FASE 2.3**: Genera 5 template mancanti (TorchTune, Axolotl, LlamaFactory, veRL, OpenRLHF)
+
+### High Priority (Next Session - Testing)
 - [ ] **FASE 3**: Run full test suite (765 tests) - verify no regression
+- [ ] **FASE 3**: Create 3 new examples (QLoRA+SFT, distillation, torchtune) + smoke tests
 
 ### Medium Priority (Docs & Polish)
-- [ ] **FASE 1.4-1.5**: Advanced schema consolidation (TECHNIQUE_STAGE_MAP, validatori)
+- [ ] **FASE 1.4-1.5**: Advanced schema consolidation (optional, riskier)
 - [ ] **FASE 4**: Update documentation (workflow.md, README.md, technical docs)
 
 ### Low Priority (Verification)
-- [ ] Create new examples (QLoRA+SFT, distillation, torchtune)
-- [ ] Smoke tests for adapter generation
+- [ ] Manual validation of new template generation
+- [ ] Integration tests for setup_* folder completeness
 
 ---
 
