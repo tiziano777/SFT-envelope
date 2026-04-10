@@ -9,11 +9,11 @@ Requirements for the lineage system milestone. Each maps to roadmap phases.
 
 ### Shared Layer
 
-- [ ] **SHRD-01**: Pydantic dataclass per tutti i nodi Neo4j (RecipeNode, ModelNode, ExperimentNode, CheckpointNode, ComponentNode)
-- [ ] **SHRD-02**: Enum RelationType per tutte le 8 relazioni del grafo
-- [ ] **SHRD-03**: DerivedFromRel model con diff_patch strutturato
-- [ ] **SHRD-04**: Envelope operativi Worker→Master (HandshakeRequest, HandshakeResponse, CheckpointPush, SyncEvent)
-- [ ] **SHRD-05**: Strategy enum (NEW, RESUME, BRANCH, RETRY)
+- [x] **SHRD-01**: Pydantic dataclass per tutti i nodi Neo4j (RecipeNode, ModelNode, ExperimentNode, CheckpointNode, ComponentNode)
+- [x] **SHRD-02**: Enum RelationType per tutte le 8 relazioni del grafo
+- [x] **SHRD-03**: DerivedFromRel model con diff_patch strutturato
+- [x] **SHRD-04**: Envelope operativi Worker→Master (HandshakeRequest, HandshakeResponse, CheckpointPush, SyncEvent)
+- [x] **SHRD-05**: Strategy enum (NEW, RESUME, BRANCH, RETRY)
 - [ ] **SHRD-06**: ConfigHasher calcola SHA256 deterministico su file trigger (config.yaml, train.py, rewards/*)
 - [ ] **SHRD-07**: ConfigSnapshot serializzabile con aggregated_hash
 - [ ] **SHRD-08**: DiffEngine produce diff git-style (line, type, content) tra snapshot

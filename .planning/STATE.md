@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-04-10T15:23:39.580Z"
-last_activity: 2026-04-10 -- Phase 1 planning complete
+status: completed
+stopped_at: Completed 01-shared-layer 01-01-PLAN.md
+last_updated: "2026-04-10T15:32:12.683Z"
+last_activity: 2026-04-10 -- Plan 01-01 completed (72 tests passing)
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** Ogni esperimento di fine-tuning e' tracciabile, riproducibile e collegato ai suoi predecessori senza azioni manuali.
-**Current focus:** Phase 1 — Shared Layer
+**Current focus:** Phase 01-shared-layer
 
 ## Current Position
 
-Phase: 1 of 10 (Shared Layer)
-Plan: 0 of 2 in current phase
-Status: Ready to execute
-Last activity: 2026-04-10 -- Phase 1 planning complete
+Phase: 01-shared-layer — EXECUTING
+Plan: 2 of 2
+Status: Completed Plan 01-01 (Data Contracts)
+Last activity: 2026-04-10 -- Plan 01-01 completed (72 tests passing)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-shared-layer P01 | 4min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,8 @@ Recent decisions affecting current work:
 
 - [Roadmap]: 10 phases following architecture doc implementation order, INFR merged into Phase 4 (Master API + Infrastructure)
 - [Roadmap]: Parallelization waves defined — Phases 2, 3, 5 can run concurrently after Phase 1
+- [Phase 01-shared-layer]: BaseNode carries id + created_at + updated_at; all 5 node types inherit via BaseNode(BaseModel)
+- [Phase 01-shared-layer]: RelationType and Strategy enums use UPPER_CASE values (protocol constants, not YAML config)
 
 ### Pending Todos
 
@@ -73,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T14:59:35.969Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-shared-layer/01-CONTEXT.md
+Last session: 2026-04-10T15:32:12.681Z
+Stopped at: Completed 01-shared-layer 01-01-PLAN.md
+Resume file: None
