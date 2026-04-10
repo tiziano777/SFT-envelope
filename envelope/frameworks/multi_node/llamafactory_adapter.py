@@ -48,12 +48,6 @@ class LlamaFactoryAdapter(BaseFrameworkAdapter):
             reqs.append("wandb>=0.16")
         return reqs
 
-    def template_context(self, config: EnvelopeConfig) -> dict[str, Any]:
-        return {
-            "config": config,
-            "technique_args": config.training.technique_args,
-            "hparam_defaults": config.hparam_overrides,
-        }
 
     def launch_command(self, config: EnvelopeConfig) -> str:
         if config.optimization.fsdp.enabled and config.hardware.gpu_count > 1:

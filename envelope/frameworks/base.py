@@ -37,9 +37,16 @@ class BaseFrameworkAdapter(ABC):
     def requirements(self, config: EnvelopeConfig) -> list[str]:
         """Return pip requirements for this framework + config combination."""
 
-    @abstractmethod
     def template_context(self, config: EnvelopeConfig) -> dict[str, Any]:
-        """Return extra context variables for the Jinja2 template."""
+        """Return extra context variables for the Jinja2 template.
+
+        Default implementation provides standard context. Override if special handling needed.
+        """
+        return {
+            "config": config,
+            "technique_args": config.training.technique_args,
+            "hparam_defaults": config.hparam_overrides,
+        }
 
     def launch_command(self, config: EnvelopeConfig) -> str:
         """Return the shell command to launch training. Override for custom launchers."""
