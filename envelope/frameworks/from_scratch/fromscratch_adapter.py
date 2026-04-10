@@ -77,7 +77,7 @@ class FromScratchAdapter(BaseFrameworkAdapter):
         return {
             "config": config,
             "technique_args": config.training.technique_args,
-            "hparam_defaults": getattr(config, "_hparam_defaults", {}),
+            "hparam_defaults": config.hparam_overrides,
             "trainer_module": trainer_module,
             "trainer_class": trainer_class,
             "triton_kernels": config.framework.triton_kernels,

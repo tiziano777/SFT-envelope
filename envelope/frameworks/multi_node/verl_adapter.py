@@ -50,7 +50,7 @@ class VeRLAdapter(BaseFrameworkAdapter):
         return {
             "config": config,
             "technique_args": config.training.technique_args,
-            "hparam_defaults": getattr(config, "_hparam_defaults", {}),
+            "hparam_defaults": config.hparam_overrides,
         }
 
     def launch_command(self, config: EnvelopeConfig) -> str:

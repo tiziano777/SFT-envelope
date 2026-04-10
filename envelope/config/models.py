@@ -413,6 +413,7 @@ class EnvelopeConfig(BaseModel):
     optimization: OptimizationConfig = Field(default_factory=OptimizationConfig)
     framework: FrameworkConfig = Field(default_factory=FrameworkConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    hparam_overrides: dict[str, Any] = Field(default_factory=dict, description="Hyperparameter defaults from techniques, can be overridden at runtime via HPARAM_* env vars")
 
     @model_validator(mode="after")
     def validate_cross_fields(self) -> EnvelopeConfig:

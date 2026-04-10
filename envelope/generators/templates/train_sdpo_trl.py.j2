@@ -16,6 +16,7 @@ from peft import LoraConfig
 {% endif %}
 from prepare import get_train_dataset, get_eval_dataset, get_tokenizer
 from diagnostics import TRLDiagnosticCallback
+from shared_utils import resolve_hyperparams
 
 # ──────────────── Hyperparameter Resolution ────────────────
 

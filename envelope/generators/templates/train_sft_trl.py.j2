@@ -15,6 +15,7 @@ from peft import LoraConfig
 {% endif %}
 from prepare import get_train_dataset, get_eval_dataset, get_tokenizer
 from diagnostics import TRLDiagnosticCallback
+from shared_utils import resolve_hyperparams
 
 # ──────────────── Hyperparameter Resolution ────────────────
 
@@ -27,24 +28,6 @@ HYPERPARAM_DEFAULTS = {
 {% endif %}
 {% endfor %}
 }
-
-
-def resolve_hyperparams(defaults: dict) -> dict:
-    resolved = dict(defaults)
-    for key in defaults:
-        env_key = f"HPARAM_{key.upper()}"
-        env_val = os.environ.get(env_key)
-        if env_val is not None:
-            default_val = defaults[key]
-            if isinstance(default_val, bool):
-                resolved[key] = env_val.lower() in ("true", "1", "yes")
-            elif isinstance(default_val, int):
-                resolved[key] = int(env_val)
-            elif isinstance(default_val, float):
-                resolved[key] = float(env_val)
-            else:
-                resolved[key] = env_val
-    return resolved
 
 
 hparams = resolve_hyperparams(HYPERPARAM_DEFAULTS)
