@@ -46,7 +46,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Data contracts: BaseNode + 5 node types, RelationType enum, DerivedFromRel, Strategy enum, 4 transport envelopes with headers
-- [ ] 01-02-PLAN.md — Utility functions: ConfigHasher (deterministic SHA256), ConfigSnapshot, DiffEngine (git-style diffs), DiffEntry model
+- [x] 01-02-PLAN.md — Utility functions: ConfigHasher (deterministic SHA256), ConfigSnapshot, DiffEngine (git-style diffs), DiffEntry model
 
 ### Phase 2: Database Layer
 **Goal**: Neo4j stores and retrieves experiment lineage data with enforced constraints and automatic housekeeping

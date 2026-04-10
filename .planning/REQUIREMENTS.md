@@ -14,10 +14,10 @@ Requirements for the lineage system milestone. Each maps to roadmap phases.
 - [x] **SHRD-03**: DerivedFromRel model con diff_patch strutturato
 - [x] **SHRD-04**: Envelope operativi Worker→Master (HandshakeRequest, HandshakeResponse, CheckpointPush, SyncEvent)
 - [x] **SHRD-05**: Strategy enum (NEW, RESUME, BRANCH, RETRY)
-- [ ] **SHRD-06**: ConfigHasher calcola SHA256 deterministico su file trigger (config.yaml, train.py, rewards/*)
-- [ ] **SHRD-07**: ConfigSnapshot serializzabile con aggregated_hash
-- [ ] **SHRD-08**: DiffEngine produce diff git-style (line, type, content) tra snapshot
-- [ ] **SHRD-09**: requirements.txt incluso nel diff testuale ma escluso dal trigger hash
+- [x] **SHRD-06**: ConfigHasher calcola SHA256 deterministico su file trigger (config.yaml, train.py, rewards/*)
+- [x] **SHRD-07**: ConfigSnapshot serializzabile con aggregated_hash
+- [x] **SHRD-08**: DiffEngine produce diff git-style (line, type, content) tra snapshot
+- [x] **SHRD-09**: requirements.txt incluso nel diff testuale ma escluso dal trigger hash
 
 ### Database Layer
 
