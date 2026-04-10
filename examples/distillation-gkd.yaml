@@ -1,0 +1,55 @@
+experiment:
+  name: distillation-gkd-example
+  description: GKD distillation with teacher model validation
+  seed: 42
+
+model:
+  name_or_path: meta-llama/Llama-2-7b-hf
+  max_seq_length: 512
+
+training:
+  technique: gkd
+  stage: null
+  peft:
+    method: none
+  precision:
+    compute_dtype: bf16
+    quantization: none
+  technique_args:
+    temperature: 0.9
+    lmbda: 0.5
+    beta: 0.5
+
+dataset:
+  path: datasets/example_instruct
+  format: instruction
+  train_split: train
+
+reward:
+  functions: null
+
+reference_model:
+  enabled: false
+
+teacher_model:
+  enabled: true
+  name_or_path: meta-llama/Llama-2-13b-hf
+  share_layers: false
+
+hardware:
+  gpu_count: 2
+  use_distributed: false
+
+optimization:
+  flash_attention: v2
+  gradient_checkpointing: true
+  fsdp:
+    enabled: false
+
+framework:
+  backend: trl
+
+output:
+  dir: ./output/distillation-gkd
+  logging_steps: 50
+  save_steps: 500
