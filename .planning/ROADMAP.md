@@ -42,11 +42,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. ConfigHasher produces identical SHA256 hashes for identical config/train/rewards files across runs, and requirements.txt is excluded from the trigger hash
   3. DiffEngine produces a git-style diff (line number, change type, content) between two ConfigSnapshots
   4. All transport envelopes (HandshakeRequest/Response, CheckpointPush, SyncEvent) and the Strategy enum serialize/deserialize correctly for HTTP transport
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Data contracts: BaseNode + 5 node types, RelationType enum, DerivedFromRel, Strategy enum, 4 transport envelopes with headers
+- [ ] 01-02-PLAN.md — Utility functions: ConfigHasher (deterministic SHA256), ConfigSnapshot, DiffEngine (git-style diffs), DiffEntry model
 
 ### Phase 2: Database Layer
 **Goal**: Neo4j stores and retrieves experiment lineage data with enforced constraints and automatic housekeeping
@@ -193,7 +193,7 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Shared Layer | 0/2 | Not started | - |
+| 1. Shared Layer | 0/2 | Planning complete | - |
 | 2. Database Layer | 0/2 | Not started | - |
 | 3. Observability | 0/1 | Not started | - |
 | 4. Master API + Infrastructure | 0/3 | Not started | - |
