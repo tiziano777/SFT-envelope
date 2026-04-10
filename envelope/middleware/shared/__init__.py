@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from envelope.middleware.shared.config_hasher import ConfigHasher, ConfigSnapshot
+from envelope.middleware.shared.diff_engine import DiffEngine, DiffEntry
 from envelope.middleware.shared.envelopes import (
     CheckpointPush,
     HandshakeRequest,
@@ -36,4 +38,9 @@ __all__ = [
     "HandshakeResponse",
     "CheckpointPush",
     "SyncEvent",
+    # utilities
+    "ConfigHasher",
+    "ConfigSnapshot",
+    "DiffEngine",
+    "DiffEntry",
 ]
