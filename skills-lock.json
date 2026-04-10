@@ -4,12 +4,12 @@
     "caveman": {
       "source": "JuliusBrussee/caveman",
       "sourceType": "github",
-      "computedHash": "76ebe665f225f9874aa53648747e2027238d67f7d50fcddd2644d3742e9cb685"
+      "computedHash": "4d486dd6f9fbb27ce1c51c972c9a5eb25a53236ae05eabf4d076ac1e293f4b7a"
     },
     "caveman-review": {
       "source": "JuliusBrussee/caveman",
       "sourceType": "github",
-      "computedHash": "db3c51874c89b161ace6d15e8387022862aab2bdf36fa05a07f928d7b139a52f"
+      "computedHash": "1dc59e7e896bc9dd449e43116c4c8b2e656b88c3370df91848330c17347af3d0"
     }
   }
 }
