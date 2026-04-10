@@ -61,7 +61,7 @@ envelope compatible grpo
 
 **Decisione**: scegli la tecnica (`grpo`) e il framework backend (`trl`).
 
-> **Per coding agents**: le 14 tecniche sono elencate in `docs/techniques.md`.
+> **Per coding agents**: le 19 tecniche sono elencate in `docs/techniques.md`.
 > La compatibility matrix si trova in `envelope/frameworks/capability_matrix.py`.
 
 ---
@@ -162,6 +162,40 @@ optimization:
 
 > Vincoli: FSDP supportato da TRL, Axolotl, LlamaFactory, From Scratch. Non compatibile con Unsloth (single-GPU only) e OpenRLHF (usa DeepSpeed). Torchtune e veRL gestiscono FSDP internamente.
 
+### Framework Support Matrix
+
+Tutti gli 8 framework sono supportati e generano setup funzionanti:
+
+| Framework | Tipo | Tecniche | Livello |
+|-----------|------|----------|--------|
+| **TRL** | Single-node | sft, dpo, grpo, ppo, gkd, distillation, reward_modeling | ✅ Completo |
+| **Unsloth** | Single-node | sft, dpo, grpo | ✅ Completo |
+| **Torchtune** | Single-node | sft, dpo | ✅ Completo |
+| **Axolotl** | Single-node | sft, dpo | ✅ Completo |
+| **veRL** | Multi-node | grpo, ppo, dapo, vapo | ✅ Completo |
+| **OpenRLHF** | Multi-node | sft, dpo, grpo, ppo | ✅ Completo |
+| **LlamaFactory** | Multi-node | sft, dpo, kto, orpo | ✅ Completo |
+| **From Scratch** | PyTorch raw | tutte le 19 tecniche | ✅ Completo |
+
+Vedi `docs/frameworks.md` per dettagli su ogni backend.
+
+### 3 Example Configurations
+
+Copia uno dei 3 example configs per iniziare rapidamente:
+
+```bash
+# QLoRA + SFT (standard single-GPU setup)
+cp examples/qlofa-sft.yaml configs/my_config.yaml
+
+# Distillation con teacher model (GKD)
+cp examples/distillation-gkd.yaml configs/my_distill.yaml
+
+# TorchTune backend (nuovo, full YAML config)
+cp examples/torchtune-sft.yaml configs/my_torchtune.yaml
+```
+
+Ogni esempio è minimale ma completo, pronto per essere adattato.
+
 ---
 
 ## FASE 3 — Valida il config
@@ -242,6 +276,31 @@ HPARAM_LEARNING_RATE=3e-5 HPARAM_PER_DEVICE_TRAIN_BATCH_SIZE=4 bash run.sh
 
 Se va in OOM: riduci `num_generations`, `max_seq_length`, o aggiungi quantizzazione nel config YAML e ri-genera il setup dalla FASE 4.
 
+### Nuovo: hparam_overrides nel YAML
+
+A partire dalla refactoring di aprile 2026, puoi anche specificare overrides direttamente nel YAML config:
+
+```yaml
+experiment:
+  name: "my-experiment"
+
+# ... altre sezioni ...
+
+# Opzionale: sovrascrivi hyperparameter defaults nel YAML
+hparam_overrides:
+  learning_rate: 2e-4
+  per_device_train_batch_size: 8
+  num_epochs: 3
+```
+
+Al momento della generazione del setup, questi overrides vengono embeddati in `train.py` come default. Le env vars `HPARAM_*` continuano a sovrascrivere i valori nel config (stesso meccanismo di prima).
+
+**Precedenza** (dal più specifico al più generale):
+1. `HPARAM_*` env var → priorità massima
+2. `hparam_overrides` nel config YAML
+3. Framework defaults (TRL, Unsloth, etc.)
+4. Envelope defaults globali
+
 ---
 
 ## FASE 6 — Itera
@@ -262,7 +321,7 @@ In base ai risultati, le opzioni sono:
 
 | Comando | Descrizione |
 |---------|-------------|
-| `envelope techniques` | Lista le 14 tecniche registrate |
+| `envelope techniques` | Lista le 19 tecniche registrate |
 | `envelope frameworks` | Lista gli 8 framework backend |
 | `envelope compatible TECNICA` | Framework compatibili con una tecnica |
 | `envelope validate --config FILE` | Valida un config YAML |
@@ -277,3 +336,17 @@ In base ai risultati, le opzioni sono:
 | `make test` | Esegui test suite |
 | `make lint` | Linting con ruff |
 | `make format` | Formattazione con ruff |
+
+---
+
+## Riferimenti Ulteriori
+
+- **Architettura tecnica**: `docs/architecture.md`
+- **Schema configurazione**: `docs/config.md`
+- **Tecniche di training**: `docs/techniques.md` (19 tecniche documentate)
+- **Framework backend**: `docs/frameworks.md` (8 framework, capability matrix)
+- **Diagnostica esecuzione**: `docs/diagnostics.md`
+- **Ottimizzazioni recenti**: `docs/optimization-notes.md` (refactoring april 2026)
+- **FSDP multi-GPU**: `docs/fsdp.md`
+- **Training from scratch**: `docs/from-scratch.md`
+- **3 example configs**: `examples/qlofa-sft.yaml`, `examples/distillation-gkd.yaml`, `examples/torchtune-sft.yaml`
