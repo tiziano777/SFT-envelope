@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - Wave 5: Phase 9
 - Wave 6: Phase 10
 
-- [ ] **Phase 1: Shared Layer** - Pydantic dataclasses, enums, ConfigHasher, DiffEngine, and transport envelopes
+- [x] **Phase 1: Shared Layer** - Pydantic dataclasses, enums, ConfigHasher, DiffEngine, and transport envelopes
 - [ ] **Phase 2: Database Layer** - Neo4j schema, APOC triggers, driver, and repository with atomic Cypher queries
 - [ ] **Phase 3: Observability** - Phoenix tracing setup, OTEL integration, and Docker service
 - [ ] **Phase 4: Master API + Infrastructure** - FastAPI endpoints, LineageController, auth middleware, Docker Compose, Makefile
@@ -193,7 +193,7 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Shared Layer | 0/2 | Planning complete | - |
+| 1. Shared Layer | 2/2 | Complete | 2026-04-10 |
 | 2. Database Layer | 0/2 | Not started | - |
 | 3. Observability | 0/1 | Not started | - |
 | 4. Master API + Infrastructure | 0/3 | Not started | - |
