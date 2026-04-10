@@ -1,13 +1,12 @@
 # AI Experiment Lineage System — Architecture & Implementation Guide
 
-> **Documento unificato** per la progettazione, implementazione e integrazione del sistema di tracciamento del lineage di esperimenti AI.
-> Ottimizzato per lettura da parte di agenti AI (Claude Code) e pianificazione task-oriented.
+> **SCOPE** progettazione, implementazione e integrazione del sistema di tracciamento del lineage di esperimenti AI.
+
 
 ---
 
 ## Indice
-
-0. [Ottimizzazione Preventiva](#0-ottimizzazione-preventiva)
+0. [TOOLS](#0-tools)
 1. [Visione d'insieme](#1-visione-dinsieme)
 2. [Struttura del Progetto](#2-struttura-del-progetto)
 3. [Data Model — Neo4j Graph Schema](#3-data-model--neo4j-graph-schema)
@@ -24,8 +23,8 @@
 14. [Ordine di Implementazione Consigliato](#14-ordine-di-implementazione-consigliato)
 
 ---
-## 0. Ottimizzazione Preventiva
-Dobbiamo applicare molti cambiamenti su questa codebase, prima di farlo, vorrei che la leggessi e cercassi di capire quali sono i punti critici che possono generare errori, overheads, vincoli troppo stringenti che potrebbero alterarne la flessibilità, estendibilità e modularità dei moduli. Cerca anche di capire quali info sono inutili, per snellire il progetto attuale ove serve, mantenendo comunque la stessa utilità marginale senza compromettere il progetto. Esegui dei test, magari creando nuovi exmples/* e nuovi setups/*. Poi rifletti le eventuali semplificazioni prima su workflow.md e README.md ove necessario, poi nelle docs/*.md ove necessario, e poi in questo file (dal capitolo 1 in poi) unificando il progetto di integrazione sulle nostre nuove fondamenta, cosi da agevolare l'integrazione che stiamo proponendo. Una volta semlificata la codebase e unificato integrazione con questo file, pianifica ed esegui il piano. ricorda che hai a disposizione le skill di claude per otitmizzare contesto, leggere codebases in modo strutturato, e gestire context e altro ancora!
+## 0. TOOLS
+Ricorda che hai a disposizione le skill di claude per ottimizzare contesto, leggere codebases in modo strutturato, e gestire context e altro ancora, hai caveman, rtk, e gsd. Non dimenticare di usarli!
 
 ## 1. Visione d'insieme
 
@@ -194,15 +193,14 @@ Solo i seguenti file **esistenti** vengono modificati. Tutto il resto è **aggiu
 ### 3.1 Nodi
 
 #### `Recipe`
-Punto di ingresso di ogni esperimento. Contiene la configurazione dichiarativa.
+Punto di ingresso di ogni esperimento. Contiene la configurazione dichiarativa. Definito come **BaseModel** Pydantic per coerenza con tutti gli altri nodi.
 
 ```python
-@dataclass
-class RecipeNode:
+class RecipeNode(BaseModel):
     recipe_id: str          # UUID
     name: str               # UNIQUE
     description: str
-    scope: str              
+    scope: str
     tasks: list[str]
     tags: list[str]
     issued: datetime
@@ -271,7 +269,7 @@ Entità atomica dei pesi. Può avere `uri = NULL` se scartato.
 | `ckp_id` | UUID | |
 | `epoch` | int | |
 | `run` | int | Indice della run nell'esperimento |
-| `metrics_snapshot` | jsonb | JSON snapshot metriche al momento del salvataggio |
+| `metrics_snapshot` | dict | JSON snapshot metriche al momento del salvataggio (dict Python, convertibile a JSON per operazioni/comunicazioni) |
 | `uri` | Optional[str] | `NULL` se scartato/perso; use prefix to identify location (optional)`worker://`, `master://`, `s3://` ... |
 | `is_usable` | bool | Può essere usato per resume/branch |
 | `is_merging` | bool | Partecipa a un'operazione di merge |
@@ -337,6 +335,7 @@ CREATE CONSTRAINT recipe_id     IF NOT EXISTS FOR (r:Recipe)     REQUIRE r.recip
 CREATE CONSTRAINT experiment_id IF NOT EXISTS FOR (e:Experiment) REQUIRE e.exp_id IS UNIQUE;
 CREATE CONSTRAINT checkpoint_id IF NOT EXISTS FOR (c:Checkpoint) REQUIRE c.ckp_id IS UNIQUE;
 CREATE CONSTRAINT model_name    IF NOT EXISTS FOR (m:Model)      REQUIRE m.model_name IS UNIQUE;
+CREATE CONSTRAINT component_composite IF NOT EXISTS FOR (c:Component) REQUIRE (c.technique_code, c.framework_code) IS UNIQUE;
 ```
 
 ### 3.4 APOC Triggers
@@ -357,20 +356,22 @@ CALL apoc.trigger.install('neo4j', 'setNodeTimestamps', '
 ', {phase: "before"});
 ```
 
-**Validation guard** (Checkpoint orfano):
+**Validation guard** (Checkpoint orfano — con eccezione per merge):
 
 ```cypher
 CALL apoc.trigger.install('neo4j', 'validateCheckpointHasExperiment', '
   UNWIND $createdNodes AS n
-  WITH n WHERE "Checkpoint" IN labels(n)
+  WITH n WHERE "Checkpoint" IN labels(n) AND NOT coalesce(n.is_merging, false)
   CALL apoc.util.validate(
     NOT EXISTS { MATCH (e:Experiment)-[:PRODUCED]->(n) },
-    "Checkpoint %s must have a PRODUCED relationship from an Experiment",
+    "Checkpoint %s must have a PRODUCED relationship from an Experiment (or is_merging=true for merged checkpoints)",
     [n.ckp_id]
   )
   RETURN n
 ', {phase: "before"});
 ```
+
+**Nota**: Il trigger esclude i checkpoint con `is_merging = true` (flag che indica partecipazione a operazione di merge), permettendo ai checkpoint merged di esistere senza relazione `PRODUCED` diretta da un esperimento attivo.
 
 > **⚠️ Agent Note**: I trigger APOC richiedono che il plugin APOC sia installato e che `apoc.trigger.enabled=true` sia nella configurazione Neo4j. Verificare nel `docker-compose.yml` prima di eseguire lo schema.
 
@@ -409,7 +410,7 @@ class RelationType(str, Enum):
 class DerivedFromRel(BaseModel):
     source_exp_id: str
     target_exp_id: str
-    diff_patch: dict  # {filename: (old_hash, new_hash)}
+    diff_patch: dict  # {filename: [diff_entries]} — git-style, vedere §4.2
 
 # Enum strategia handshake
 class Strategy(str, Enum):
@@ -421,14 +422,13 @@ class Strategy(str, Enum):
 # Envelope operativi Worker → Master
 class HandshakeRequest(BaseModel):
     config_hash: str           # SHA256 aggregato dei file trigger
-    hyperparams_hash: str
-    req_hash: str              # SHA256 di requirements.txt (non trigger, ma tracciato)
+    req_hash: str              # SHA256 di requirements.txt (trigger file)
     code_hash: str             # SHA256 di train.py (incluso nell'aggregated_hash)
     checkpoint_id_to_resume: Optional[str] = None
     scaffold_path: str
     base_exp_id: Optional[str] = None    # richiesto per BRANCH
-    recipe_id: Optional[str] = None
-    model_id: Optional[str] = None
+    recipe_id: str             # Obbligatorio: traccia sempre l'origine
+    model_id: str              # Obbligatorio: traccia sempre il modello base
     # Contenuti testuali dei file (inviati al Master per popolare ExperimentNode)
     config_text: str           # contenuto di config.yaml
     train_text: str            # contenuto di train.py
@@ -873,20 +873,27 @@ class URIResolver:
 
 ### 7.2 Caso: RESUME (Continuità)
 
-**Trigger**: Il Worker invia lo stesso triplo hash (`config`, `hyperparams`, `code`) e chiede di ripartire dall'ultimo checkpoint della stessa run.
+**Trigger**: Il Worker invia lo stesso triplo hash (`config`, `requirements`, `code`) e chiede di ripartire dall'ultimo checkpoint della stessa run.
 
 **Comportamento Master**: Autorizza il proseguimento sullo stesso nodo `Experiment` senza creare nuovi nodi.
 
 ### 7.3 Caso: BRANCH (Cambio Traiettoria)
 
-**Trigger**: Hash config/hyperparams/code diverso rispetto all'esperimento precedente + checkpoint di partenza fornito.
+**Trigger**: Hash config/requirements/code diverso rispetto all'esperimento precedente.
 
-**Comportamento Master**:
-1. Crea nuovo `Experiment`.
-2. Lega con `DERIVED_FROM {diff_patch}` all'esperimento precedente.
-3. Lega con `STARTED_FROM` al checkpoint fisico di partenza.
+**Due subcasi**:
 
-**Nota**: È possibile fare un BRANCH che parte dal modello base (senza `STARTED_FROM`), per esempio se si vuole solo cambiare gli iperparametri e ripartire da zero. In quel caso si invia solo `DERIVED_FROM`, senza `STARTED_FROM`.
+1. **BRANCH con Checkpoint di partenza** (`checkpoint_id_to_resume` fornito):
+   - Master crea nuovo `Experiment`.
+   - Lega con `DERIVED_FROM {diff_patch}` all'esperimento precedente.
+   - Lega con `STARTED_FROM` al checkpoint fisico di partenza.
+   - I pesi vengono caricati dal checkpoint (non da zero).
+
+2. **BRANCH senza Checkpoint** (`checkpoint_id_to_resume = None`) — opzione: cambio configurazione ripartendo da zero o dal modello base:
+   - Master crea nuovo `Experiment`.
+   - Lega con `DERIVED_FROM {diff_patch}` all'esperimento precedente.
+   - **NON** crea `STARTED_FROM` (non abbiamo checkpoint source).
+   - Allineamento logico: il nuovo esperimento è una derivazione del precedente, ma i pesi non vengono ereditati— il training ricomincia da zero o dal modello base.
 
 ### 7.4 Caso: RETRY (Nuovo Tentativo)
 
