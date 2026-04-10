@@ -15,6 +15,8 @@ YAML config ──> [envelope] ──> setup_myexp/
 
 Legge un file YAML e genera una cartella `setup_{name}/` autocontenuta con tutto il necessario per lanciare un training. Ogni setup include `prepare.py` (preparazione dataset con caching idempotente) e `train.py` (loop di training). Supporta 19 tecniche di training, 8 framework backend, PEFT (LoRA/QLoRA/DoRA/RSLoRA), quantizzazione (NF4/INT8/GPTQ/AWQ/FP8), hardware-aware optimization e un'architettura a plugin estensibile.
 
+> **📝 Nota**: Per un overview tecnico delle recenti ottimizzazioni e miglioramenti architetturali, vedi [`docs/optimization-notes.md`](docs/optimization-notes.md).
+
 ## Tecniche supportate
 
 | Stage | Tecnica | Descrizione |
