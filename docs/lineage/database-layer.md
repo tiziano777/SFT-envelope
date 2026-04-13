@@ -23,7 +23,7 @@ The Database Layer manages experiment lineage data in Neo4j 5.x, providing atomi
 - `Checkpoint` — Saved model artifact (epoch/run)
 - `Component` — Framework/technique pair
 
-**Relations (8 types):**
+**Relations (7 types):**
 | Relation | From | To | Purpose |
 |----------|------|----|-|
 | `PRODUCED_BY` | Checkpoint | Experiment | Checkpoint belongs to experiment |
@@ -33,7 +33,6 @@ The Database Layer manages experiment lineage data in Neo4j 5.x, providing atomi
 | `USES_TECHNIQUE` | Experiment | Component | Experiment uses technique |
 | `USES_MODEL` | Experiment | Model | Experiment uses base model |
 | `USES_RECIPE` | Experiment | Recipe | Experiment from recipe |
-| `OPTIMIZED_WITH` | Experiment | Component | Optimization setting |
 
 ---
 

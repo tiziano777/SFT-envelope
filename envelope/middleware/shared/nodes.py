@@ -84,9 +84,17 @@ class CheckpointNode(BaseNode):
 
 
 class ComponentNode(BaseNode):
-    """Component node -- (technique, framework) pair from capability matrix."""
+    """Component node -- (technique, framework) pair from capability matrix.
 
-    technique_code: str = Field(..., min_length=1)
-    framework_code: str = Field(..., min_length=1)
+    A Component represents a validated combination of technique + framework.
+    If a (technique, framework) combo is not supported, the Component doesn't exist.
+    This enforces compatibility at the data model level.
+
+    Example: (lora_grpo, unsloth) exists, (qora, unsloth) doesn't exist → query returns None
+    """
+
+    opt_code: str = Field(..., min_length=1, description="Optimization code/identifier")
+    technique_code: str = Field(..., min_length=1, description="Technique code (e.g., lora_grpo)")
+    framework_code: str = Field(..., min_length=1, description="Framework code (e.g., unsloth)")
     docs_url: str = ""
     description: str = ""

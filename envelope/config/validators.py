@@ -38,6 +38,34 @@ def validate_config(config: EnvelopeConfig) -> list[str]:
     return errors
 
 
+# --- Worker Daemon Naming ---
+
+WORKER_DAEMON_NAME_PATTERN = "worker-{exp_id}-{recipe_id}"
+
+
+def validate_worker_daemon_name(daemon_name: str, exp_id: str, recipe_id: str) -> list[str]:
+    """Validate worker daemon naming follows the standard pattern: worker-{exp_id}-{recipe_id}.
+
+    Args:
+        daemon_name: The daemon name to validate
+        exp_id: Experiment ID
+        recipe_id: Recipe ID
+
+    Returns:
+        List of error messages (empty = valid)
+    """
+    errors: list[str] = []
+    expected_pattern = WORKER_DAEMON_NAME_PATTERN.format(exp_id=exp_id, recipe_id=recipe_id)
+
+    if daemon_name != expected_pattern:
+        errors.append(
+            f"Worker daemon name must follow pattern '{WORKER_DAEMON_NAME_PATTERN}'. "
+            f"Got '{daemon_name}', expected '{expected_pattern}'."
+        )
+
+    return errors
+
+
 def validate_config_or_raise(config: EnvelopeConfig) -> None:
     """Validate config and raise ConfigValidationError if issues found."""
     errors = validate_config(config)
