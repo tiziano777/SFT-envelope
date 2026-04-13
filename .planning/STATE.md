@@ -77,6 +77,12 @@ None yet.
 
 None yet.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260413-imr | Remove OPTIMIZED_WITH relationship and formalize worker daemon naming | 2026-04-13 | e5f5307 | [260413-imr-remove-optimized-with-relationship-and-f](./quick/260413-imr-remove-optimized-with-relationship-and-f/) |
+
 ## Session Continuity
 
 Last session: 2026-04-10T15:38:13.994Z
