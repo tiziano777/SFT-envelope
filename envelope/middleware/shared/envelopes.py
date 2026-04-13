@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # --- Strategy ---
@@ -41,6 +41,13 @@ class HandshakeRequest(BaseModel):
     rewards_texts: list[str] = Field(default_factory=list)
     rewards_filenames: list[str] = Field(default_factory=list)
     headers: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _rewards_lists_aligned(self) -> HandshakeRequest:
+        if len(self.rewards_texts) != len(self.rewards_filenames):
+            msg = f"rewards_texts ({len(self.rewards_texts)}) and rewards_filenames ({len(self.rewards_filenames)}) must have equal length"
+            raise ValueError(msg)
+        return self
 
 
 class HandshakeResponse(BaseModel):

@@ -44,30 +44,30 @@ class TestComputeFileDiff:
     def test_single_line_added(self) -> None:
         result = DiffEngine.compute_file_diff("", "new line")
         assert len(result) == 1
-        assert result[0] == {"line": 1, "type": "added", "content": "new line"}
+        assert result[0].model_dump() == {"line": 1, "type": "added", "content": "new line"}
 
     def test_single_line_removed(self) -> None:
         result = DiffEngine.compute_file_diff("old line", "")
         assert len(result) == 1
-        assert result[0] == {"line": 1, "type": "removed", "content": "old line"}
+        assert result[0].model_dump() == {"line": 1, "type": "removed", "content": "old line"}
 
     def test_single_line_changed(self) -> None:
         result = DiffEngine.compute_file_diff("old", "new")
         assert len(result) == 2
-        removed = [e for e in result if e["type"] == "removed"]
-        added = [e for e in result if e["type"] == "added"]
+        removed = [e for e in result if e.type == "removed"]
+        added = [e for e in result if e.type == "added"]
         assert len(removed) == 1
         assert len(added) == 1
-        assert removed[0]["content"] == "old"
-        assert added[0]["content"] == "new"
+        assert removed[0].content == "old"
+        assert added[0].content == "new"
 
     def test_multi_line_change_at_different_positions(self) -> None:
         old_text = "line 1\nline 2\nline 3\nline 4\nline 5"
         new_text = "line 1\nMODIFIED\nline 3\nline 4\nCHANGED"
         result = DiffEngine.compute_file_diff(old_text, new_text)
         # Should have changes at line 2 and line 5
-        removed_lines = [e["line"] for e in result if e["type"] == "removed"]
-        added_lines = [e["line"] for e in result if e["type"] == "added"]
+        removed_lines = [e.line for e in result if e.type == "removed"]
+        added_lines = [e.line for e in result if e.type == "added"]
         assert 2 in removed_lines
         assert 2 in added_lines
         assert 5 in removed_lines
@@ -79,12 +79,12 @@ class TestComputeFileDiff:
         new_text = "a\nB\nc"
         result = DiffEngine.compute_file_diff(old_text, new_text)
         assert len(result) == 2  # one removed, one added
-        removed = [e for e in result if e["type"] == "removed"]
-        added = [e for e in result if e["type"] == "added"]
-        assert removed[0]["content"] == "b"
-        assert added[0]["content"] == "B"
-        assert removed[0]["line"] == 2
-        assert added[0]["line"] == 2
+        removed = [e for e in result if e.type == "removed"]
+        added = [e for e in result if e.type == "added"]
+        assert removed[0].content == "b"
+        assert added[0].content == "B"
+        assert removed[0].line == 2
+        assert added[0].line == 2
 
 
 class TestComputeScaffoldDiff:

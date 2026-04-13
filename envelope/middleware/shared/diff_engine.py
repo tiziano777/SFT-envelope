@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import difflib
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +19,7 @@ class DiffEntry(BaseModel):
     """Structured diff entry with line number, change type, and content."""
 
     line: int = Field(..., ge=1, description="Line number in old file (removed) or new file (added)")
-    type: str = Field(..., description="'added' or 'removed'")
+    type: Literal["added", "removed"] = Field(..., description="'added' or 'removed'")
     content: str = Field(..., description="Line content without trailing newline")
 
 
@@ -37,10 +37,10 @@ class DiffEngine:
     def compute_file_diff(
         old_text: str,
         new_text: str,
-    ) -> list[dict[str, int | str]]:
+    ) -> list[DiffEntry]:
         """Compute a list of diff entries between two text versions.
 
-        Each entry is a dict with keys: line (int), type (str), content (str).
+        Each entry is a DiffEntry with line number (int), type (str: 'added'/'removed'), and content (str).
         Uses difflib.unified_diff with n=0 context lines and parses @@ headers
         for line number extraction.
         """
@@ -50,7 +50,7 @@ class DiffEngine:
         if old_lines == new_lines:
             return []
 
-        result: list[dict[str, int | str]] = []
+        result: list[DiffEntry] = []
         old_ln = 0
         new_ln = 0
 
@@ -68,18 +68,18 @@ class DiffEngine:
                 continue
             if line.startswith("-"):
                 old_ln += 1
-                result.append({
-                    "line": old_ln,
-                    "type": "removed",
-                    "content": line[1:],
-                })
+                result.append(DiffEntry(
+                    line=old_ln,
+                    type="removed",
+                    content=line[1:],
+                ))
             elif line.startswith("+"):
                 new_ln += 1
-                result.append({
-                    "line": new_ln,
-                    "type": "added",
-                    "content": line[1:],
-                })
+                result.append(DiffEntry(
+                    line=new_ln,
+                    type="added",
+                    content=line[1:],
+                ))
 
         return result
 

@@ -14,6 +14,7 @@ Le directory `setup_*` sono **immutabili** una volta generate. Gli iperparametri
 - Click per CLI
 - Rich per output formattato
 - Jinja2 per template
+- Neo4j for tracking storage
 
 ## Convenzioni
 
@@ -80,3 +81,14 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 2. Use `detect_changes` for code review.
 3. Use `get_affected_flows` to understand impact.
 4. Use `query_graph` pattern="tests_for" to check coverage.
+
+## Best Practices
+
+- TDD development
+- Ask Questions about choices, especially when a tradeoff emerging
+- Start from a object oriented style, from abstarction to implementations
+- Ensure always the maximum modularity and extendability
+- we have a .venv in the project to run tests and other commands
+- You do not assume anithing, if some context is missing, ask for a deep explanation
+- After every User story or stage, you have to test and update documentation of the project application, test the User story and checking for a refactoring
+- Updating documentation requires to modify only the relevat documents between README.md, workflow.md and files in docs/*

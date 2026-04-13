@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # --- ConfigSnapshot ---
@@ -27,6 +27,13 @@ class ConfigSnapshot(BaseModel):
         description="SHA256 of sorted concatenated file hashes",
     )
     created_at: datetime
+
+    @model_validator(mode="after")
+    def _snapshot_id_matches_aggregated(self) -> ConfigSnapshot:
+        if self.snapshot_id != self.aggregated_hash:
+            msg = "snapshot_id must equal aggregated_hash"
+            raise ValueError(msg)
+        return self
 
 
 # --- ConfigHasher ---
