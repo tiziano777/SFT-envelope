@@ -9,7 +9,7 @@ from pathlib import Path
 
 import docker
 import pytest
-from neo4j.asyncio import AsyncDriver, GraphDatabase
+from neo4j import AsyncDriver, AsyncGraphDatabase
 from neo4j.exceptions import ServiceUnavailable
 
 
@@ -42,7 +42,7 @@ def neo4j_container(docker_client: docker.DockerClient):
     max_retries = 30
     for attempt in range(max_retries):
         try:
-            driver = GraphDatabase.driver(
+            driver = AsyncGraphDatabase.driver(
                 "bolt://localhost:7687",
                 auth=("neo4j", "password"),
             )

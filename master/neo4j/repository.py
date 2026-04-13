@@ -6,7 +6,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from neo4j.asyncio import AsyncDriver
+from neo4j import AsyncDriver
 
 from envelope.middleware.shared.nodes import CheckpointNode, ExperimentNode
 from envelope.middleware.shared.config_hasher import ConfigSnapshot

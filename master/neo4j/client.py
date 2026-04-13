@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from neo4j.asyncio import AsyncDriver, GraphDatabase
+from neo4j import AsyncDriver, AsyncGraphDatabase
 
 
 # Module-level singleton
@@ -32,7 +32,7 @@ async def get_driver(reinit: bool = False) -> AsyncDriver:
         password = os.getenv("NEO4J_PASSWORD", "password")
         pool_size = int(os.getenv("NEO4J_POOL_SIZE", "50"))
 
-        _driver = GraphDatabase.driver(
+        _driver = AsyncGraphDatabase.driver(
             uri,
             auth=(user, password),
             max_pool_size=pool_size,
@@ -47,3 +47,35 @@ async def close_driver() -> None:
     if _driver is not None:
         await _driver.close()
         _driver = None
+
+
+class Neo4jClient:
+    """Singleton wrapper for Neo4j driver and repository access."""
+
+    _instance: Optional[Neo4jClient] = None
+    _repository: Optional[object] = None
+
+    def __init__(self, driver: AsyncDriver | None = None):
+        """Initialize Neo4jClient wrapper.
+
+        Args:
+            driver: Optional AsyncDriver instance. If None, get_driver() will be called.
+        """
+        self.driver = driver
+        self._repo = None
+
+    @classmethod
+    def get_instance(cls) -> Neo4jClient:
+        """Get or create singleton instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @property
+    def repository(self):
+        """Lazy-load repository from master.neo4j.repository."""
+        if self._repo is None:
+            from master.neo4j.repository import ExperimentRepositoryAsync
+
+            self._repo = ExperimentRepositoryAsync(self.driver)
+        return self._repo
