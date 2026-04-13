@@ -108,10 +108,10 @@ Requirements for the lineage system milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOCS-01**: Aggiornare workflow.md con fasi lineage
-- [ ] **DOCS-02**: Aggiornare README.md con sezione lineage system
-- [ ] **DOCS-03**: Aggiornare docs/ esistenti con modifiche ai moduli (generator, frameworks)
-- [ ] **DOCS-04**: Nuovo doc per moduli lineage (middleware, master)
+- [x] **DOCS-01**: Aggiornare workflow.md con fasi lineage
+- [x] **DOCS-02**: Aggiornare README.md con sezione lineage system
+- [x] **DOCS-03**: Aggiornare docs/ esistenti con modifiche ai moduli (generator, frameworks)
+- [x] **DOCS-04**: Nuovo doc per moduli lineage (middleware, master)
 
 ## v2 Requirements
 
