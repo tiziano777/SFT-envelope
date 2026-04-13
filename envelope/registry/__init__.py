@@ -21,6 +21,7 @@ def discover_plugins() -> None:
     import envelope.techniques.flow  # noqa: F401
     import envelope.techniques.distillation  # noqa: F401
     import envelope.techniques.reward  # noqa: F401
+    import envelope.techniques.merge  # noqa: F401
     # Frameworks
     import envelope.frameworks.single_node  # noqa: F401
     import envelope.frameworks.multi_node  # noqa: F401

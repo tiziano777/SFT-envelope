@@ -68,6 +68,8 @@ _MATRIX: dict[tuple[str, str], bool] = {
     ("gold", "trl"): True,
     # Reward modeling — TRL only
     ("reward_modeling", "trl"): True,
+    # Merge — no-GPU, compatible with from_scratch only
+    ("merge", "from_scratch"): True,
     # from_scratch — supports ALL techniques
     ("sft", "from_scratch"): True,
     ("dpo", "from_scratch"): True,
