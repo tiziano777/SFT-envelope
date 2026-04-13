@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Master API + Infrastructure** - FastAPI endpoints, LineageController, auth middleware, Docker Compose, Makefile
 - [x] **Phase 5: Storage Layer** - BaseStorageWriter ABC, URIResolver, LocalStorage, and S3/NFS stubs
 - [x] **Phase 6: Worker Layer** - Connections, local persistence, filesystem watcher, async pusher, and daemon
-- [ ] **Phase 7: Generator Integration** - inject_worker_middleware, run.sh.j2 daemon lifecycle, merge scaffold
+- [x] **Phase 7: Generator Integration** - inject_worker_middleware, run.sh.j2 daemon lifecycle, merge scaffold
 - [x] **Phase 8: Datamix** - Multi-source config, DatamixLoader, replica oversampling, backward compatibility
 - [ ] **Phase 9: Testing** - E2E suite with simulate_worker/master, handshake/checkpoint/config/daemon tests
 - [ ] **Phase 10: Documentation** - Update workflow.md, README, existing docs, and new lineage docs
@@ -138,8 +138,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — inject_worker_middleware() in setup_generator.py, run.sh.j2 daemon lifecycle, requirements.txt.j2 worker deps
-- [ ] 07-02-PLAN.md — MergeTechnique plugin, merge.py.j2 template, capability_matrix merge entry, integration tests
+- [x] 07-01-PLAN.md — inject_worker_middleware() in setup_generator.py, run.sh.j2 daemon lifecycle, requirements.txt.j2 worker deps
+- [x] 07-02-PLAN.md — MergeTechnique plugin, merge.py.j2 template, capability_matrix merge entry, integration tests
 
 ### Phase 8: Datamix
 **Goal**: Config YAML supports multi-source dataset definitions with replica oversampling while preserving backward compatibility
@@ -168,8 +168,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — E2E test suite: simulate_worker, simulate_master, lifecycle tests
-- [ ] 09-02-PLAN.md — Strategy tests: NEW, RESUME, BRANCH, RETRY with diff verification
+- [x] 09-01-PLAN.md — E2E test suite: simulate_worker, simulate_master, lifecycle tests
+- [x] 09-02-PLAN.md — Strategy tests: NEW, RESUME, BRANCH, RETRY with diff verification
 
 ### Phase 10: Documentation
 **Goal**: All existing and new documentation reflects the lineage system integration so users can understand and operate the full system
@@ -201,5 +201,5 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 | 6. Worker Layer | 3/3 | Complete | 2026-04-13 |
 | 7. Generator Integration | 2/2 | Complete | 2026-04-13 |
 | 8. Datamix | 1/1 | Complete | 2026-04-13 |
-| 9. Testing | 0/2 | Not started | - |
+| 9. Testing | 2/2 | Created | 2026-04-13 |
 | 10. Documentation | 0/1 | Not started | - |
