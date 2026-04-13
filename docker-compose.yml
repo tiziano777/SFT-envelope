@@ -75,6 +75,36 @@ services:
       - ./master:/app/master
       - ./tests:/app/tests
 
+  streamlit:
+    build:
+      context: .
+      dockerfile: streamlit_ui/Dockerfile
+    container_name: lineage-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      MASTER_API_URL: "http://master-api:8000"
+      NEO4J_URI: "neo4j://neo4j:7687"
+      NEO4J_USER: "neo4j"
+      NEO4J_PASSWORD: "password"
+      MASTER_API_TOKEN: ""
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      master-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - lineage-network
+    volumes:
+      - ./streamlit_ui:/app/streamlit_ui
+
 volumes:
   neo4j-data:
   neo4j-logs:
