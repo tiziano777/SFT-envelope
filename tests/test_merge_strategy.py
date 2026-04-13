@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from envelope.middleware.shared.envelopes import Strategy
 from tests.utils.simulate_worker import WorkerSimulator
 
 
@@ -142,4 +143,4 @@ class TestMergeAndBranch:
         modified_config["config_hash"] = "hash_config_branch_from_merge"
         worker_simulator.exp_id = None
         hs_resp = worker_simulator.handshake(modified_config)
-        assert hs_resp.strategy == "BRANCH"
+        assert hs_resp.strategy == Strategy.BRANCH

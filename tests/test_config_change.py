@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from envelope.middleware.shared.envelopes import Strategy
 from tests.utils.simulate_worker import WorkerSimulator
 
 
@@ -14,7 +15,7 @@ class TestConfigChangeTriggerHash:
         """Test that config.yaml change triggers BRANCH strategy."""
         # Initial handshake
         hs_resp1 = worker_simulator.handshake(valid_config)
-        assert hs_resp1.strategy == "NEW"
+        assert hs_resp1.strategy == Strategy.NEW
 
         # Modify config_hash (simulates config.yaml change)
         modified_config = valid_config.copy()
@@ -23,13 +24,13 @@ class TestConfigChangeTriggerHash:
         worker_simulator.exp_id = None
         hs_resp2 = worker_simulator.handshake(modified_config)
 
-        assert hs_resp2.strategy == "BRANCH", "config.yaml change should trigger BRANCH"
+        assert hs_resp2.strategy == Strategy.BRANCH, "config.yaml change should trigger BRANCH"
 
     def test_train_change_triggers_branch(self, worker_simulator: WorkerSimulator, valid_config: dict):
         """Test that train.py change (via code_hash) triggers BRANCH strategy."""
         # Initial handshake
         hs_resp1 = worker_simulator.handshake(valid_config)
-        assert hs_resp1.strategy == "NEW"
+        assert hs_resp1.strategy == Strategy.NEW
 
         # Modify code_hash (simulates train.py change)
         modified_config = valid_config.copy()
@@ -38,16 +39,15 @@ class TestConfigChangeTriggerHash:
         worker_simulator.exp_id = None
         hs_resp2 = worker_simulator.handshake(modified_config)
 
-        assert hs_resp2.strategy == "BRANCH", "train.py change should trigger BRANCH"
+        assert hs_resp2.strategy == Strategy.BRANCH, "train.py change should trigger BRANCH"
 
     def test_rewards_change_triggers_branch(self, worker_simulator: WorkerSimulator, valid_config: dict):
         """Test that rewards/* file change triggers BRANCH strategy."""
         # Initial handshake with rewards
         hs_resp1 = worker_simulator.handshake(valid_config)
-        assert hs_resp1.strategy == "NEW"
+        assert hs_resp1.strategy == Strategy.NEW
 
         # Modify rewards config (simulates rewards file change)
-        # Note: In real implementation, rewards_texts would change
         modified_config = valid_config.copy()
         modified_config["rewards_texts"] = ["new_reward_content"]
         modified_config["rewards_filenames"] = ["reward_changed.py"]
@@ -55,8 +55,8 @@ class TestConfigChangeTriggerHash:
         worker_simulator.exp_id = None
         hs_resp2 = worker_simulator.handshake(modified_config)
 
-        # This should trigger BRANCH due to rewards change (if trigger hash includes it)
-        # Actual behavior depends on trigger hash implementation
+        # This should trigger BRANCH due to rewards change
+        assert hs_resp2.strategy == Strategy.BRANCH, "rewards/* change should trigger BRANCH"
 
 
 class TestRequirementsNotInTriggerHash:
@@ -69,7 +69,7 @@ class TestRequirementsNotInTriggerHash:
         # Initial handshake
         hs_resp1 = worker_simulator.handshake(valid_config)
         exp_id_1 = hs_resp1.exp_id
-        assert hs_resp1.strategy == "NEW"
+        assert hs_resp1.strategy == Strategy.NEW
 
         # Modify requirements_text (should NOT change hash)
         modified_config = valid_config.copy()
@@ -79,7 +79,7 @@ class TestRequirementsNotInTriggerHash:
         hs_resp2 = worker_simulator.handshake(modified_config)
 
         # Since config_hash, code_hash, req_hash are same, should not branch
-        assert hs_resp2.strategy != "BRANCH", "requirements.txt change should NOT trigger BRANCH"
+        assert hs_resp2.strategy != Strategy.BRANCH, "requirements.txt change should NOT trigger BRANCH"
         assert hs_resp2.exp_id == exp_id_1, "requirements.txt change should keep same exp_id"
 
 
@@ -140,7 +140,7 @@ class TestConfigHashConsistency:
         hs_resp2 = worker_simulator.handshake(config_reordered)
 
         # If hash is truly deterministic, should be same
-        # This may fail depending on implementation
+        assert exp_id_1 == hs_resp2.exp_id, "Config order should not affect hash"
 
 
 class TestMultipleTriggerFileChanges:
@@ -158,4 +158,4 @@ class TestMultipleTriggerFileChanges:
         worker_simulator.exp_id = None
         hs_resp2 = worker_simulator.handshake(modified_config)
 
-        assert hs_resp2.strategy == "BRANCH", "Multiple trigger file changes should trigger BRANCH"
+        assert hs_resp2.strategy == Strategy.BRANCH, "Multiple trigger file changes should trigger BRANCH"

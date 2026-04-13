@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from envelope.middleware.shared.envelopes import Strategy
 from tests.utils.simulate_worker import WorkerSimulator
 
 
@@ -57,6 +58,7 @@ class TestDerivedFromBranch:
         # Initial handshake
         hs_resp1 = worker_simulator.handshake(valid_config)
         exp_id_1 = hs_resp1.exp_id
+        assert hs_resp1.strategy == Strategy.NEW
 
         # Modified config triggers BRANCH
         modified_config = valid_config.copy()
@@ -65,7 +67,7 @@ class TestDerivedFromBranch:
         worker_simulator.exp_id = None
         hs_resp2 = worker_simulator.handshake(modified_config)
 
-        if hs_resp2.strategy == "BRANCH":
+        if hs_resp2.strategy == Strategy.BRANCH:
             # Should have created DERIVED_FROM relationship
             assert hs_resp2.exp_id != exp_id_1, "BRANCH should create new exp_id"
 
@@ -79,6 +81,7 @@ class TestFindExperimentByHashes:
         """Test finding experiment by same config hashes."""
         hs_resp1 = worker_simulator.handshake(valid_config)
         exp_id_1 = hs_resp1.exp_id
+        assert hs_resp1.strategy == Strategy.NEW
 
         # Same config should find same experiment
         worker_simulator.exp_id = None
@@ -111,6 +114,8 @@ class TestGraphCleanup:
     def test_test_label_applied(self, worker_simulator: WorkerSimulator, valid_config: dict):
         """Test that _TEST label is applied to all test nodes."""
         hs_resp = worker_simulator.handshake(valid_config)
+        assert hs_resp.exp_id, "exp_id should be set"
+
         worker_simulator.checkpoint_push(ckp_num=1)
 
         # Nodes should be tagged for cleanup
