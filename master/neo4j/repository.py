@@ -467,3 +467,54 @@ class ExperimentRepositoryAsync(BaseExperimentRepository):
             if record is None:
                 return None
             return ExperimentNode.from_neo4j(record["e"])
+
+    async def update_experiment_status(
+        self,
+        exp_id: str,
+        status: str,
+        exit_code: Optional[int] = None,
+        exit_message: Optional[str] = None,
+    ) -> None:
+        """Update experiment status.
+
+        Args:
+            exp_id: Experiment identifier
+            status: New status (RUNNING, DONE, FAILED, etc.)
+            exit_code: Optional exit code
+            exit_message: Optional exit message
+
+        Raises:
+            RepositoryError: If update fails
+        """
+        async with self.driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (e:Experiment {exp_id: $exp_id})
+                SET e.status = $status,
+                    e.exit_code = $exit_code,
+                    e.exit_message = $exit_message,
+                    e.updated_at = datetime()
+                RETURN e
+                """,
+                {
+                    "exp_id": exp_id,
+                    "status": status,
+                    "exit_code": exit_code,
+                    "exit_message": exit_message,
+                },
+            )
+            record = await result.single()
+            if record is None:
+                raise RepositoryError(f"Experiment {exp_id} not found")
+
+    async def process_sync_event(self, event) -> None:
+        """Process sync event (checkpoint ready or training completed).
+
+        Args:
+            event: SyncEvent with event_type and payload
+
+        Raises:
+            RepositoryError: If processing fails
+        """
+        # Stub implementation - specific handling in child classes
+        pass

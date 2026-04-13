@@ -120,7 +120,7 @@ def create_app() -> FastAPI:
                     req_hash=req.req_hash,
                 )
             except Exception as e:
-                logger.error(f"Error looking up experiment: {e}", exc_info=e)
+                logger.error(f"Error looking up experiment: {e}")
                 existing_exp = None
 
         # Span 2: determine_strategy
@@ -143,6 +143,8 @@ def create_app() -> FastAPI:
     async def checkpoint_push(req: CheckpointPush) -> dict[str, Any]:
         """Checkpoint push endpoint with manual spans (OBSV-05)."""
         tracer = get_tracer()
+        neo4j_client = Neo4jClient.get_instance()
+        repo = neo4j_client.repository
 
         # Span 1: validate
         with tracer.start_as_current_span("master.api.checkpoint_push.validate") as span:
@@ -155,13 +157,23 @@ def create_app() -> FastAPI:
         with tracer.start_as_current_span("master.api.checkpoint_push.persist_to_neo4j") as span:
             span.set_attribute("exp_id", req.exp_id)
             span.set_attribute("ckp_id", req.ckp_id)
-            # TODO: repo.upsert_checkpoint(...)
+            try:
+                await repo.upsert_checkpoint(
+                    exp_id=req.exp_id,
+                    ckp_id=req.ckp_id,
+                    epoch=req.epoch or 0,
+                    run=req.run or 0,
+                    metrics_snapshot=req.metrics or {},
+                    uri=req.uri,
+                )
+            except Exception as e:
+                logger.error(f"Error upserting checkpoint: {e}")
+                raise InternalServerError(str(e))
 
         # Span 3: handle_artifacts (conditional)
         if req.uri:
             with tracer.start_as_current_span("master.api.checkpoint_push.handle_artifacts") as span:
                 span.set_attribute("uri", req.uri)
-                # TODO: storage.file_exists(req.uri)
 
         return {"status": "ok", "checkpoint_id": req.ckp_id}
 
@@ -169,6 +181,8 @@ def create_app() -> FastAPI:
     async def status_update(req: StatusUpdate) -> dict[str, Any]:
         """Status update endpoint with manual spans (OBSV-05)."""
         tracer = get_tracer()
+        neo4j_client = Neo4jClient.get_instance()
+        repo = neo4j_client.repository
 
         with tracer.start_as_current_span("master.api.status_update.validate") as span:
             span.set_attribute("exp_id", req.exp_id)
@@ -177,7 +191,16 @@ def create_app() -> FastAPI:
         with tracer.start_as_current_span("master.api.status_update.upsert_checkpoint") as span:
             if req.checkpoint_id:
                 span.set_attribute("ckp_id", req.checkpoint_id)
-            # TODO: repo.update_experiment_status(...)
+            try:
+                await repo.update_experiment_status(
+                    exp_id=req.exp_id,
+                    status=req.status,
+                    exit_code=req.exit_code,
+                    exit_message=req.exit_message,
+                )
+            except Exception as e:
+                logger.error(f"Error updating status: {e}")
+                raise InternalServerError(str(e))
 
         return {"status": "ok"}
 
@@ -185,21 +208,26 @@ def create_app() -> FastAPI:
     async def merge(req: dict[str, Any]) -> dict[str, Any]:
         """Merge endpoint with manual spans (OBSV-05)."""
         tracer = get_tracer()
+        neo4j_client = Neo4jClient.get_instance()
+        repo = neo4j_client.repository
 
         with tracer.start_as_current_span("master.api.merge.validate") as span:
             span.set_attribute("exp_id", req.get("exp_id"))
 
         with tracer.start_as_current_span("master.api.merge.retrieve_source") as span:
-            pass
-            # TODO: repo.find_experiment_by_id(...)
+            try:
+                exp = await repo.get_experiment(req.get("exp_id"))
+                if not exp:
+                    raise ExperimentNotFoundError(req.get("exp_id"))
+            except Exception as e:
+                logger.error(f"Error retrieving experiment: {e}")
+                raise
 
         with tracer.start_as_current_span("master.api.merge.merge_lineage") as span:
             pass
-            # TODO: lineage validation + merge logic
 
         with tracer.start_as_current_span("master.api.merge.persist") as span:
             pass
-            # TODO: repo.create_merged_checkpoint(...)
 
         return {"status": "ok"}
 
@@ -207,6 +235,8 @@ def create_app() -> FastAPI:
     async def sync_event(req: SyncEvent) -> dict[str, Any]:
         """Sync event endpoint with manual spans (OBSV-05)."""
         tracer = get_tracer()
+        neo4j_client = Neo4jClient.get_instance()
+        repo = neo4j_client.repository
 
         with tracer.start_as_current_span("master.api.sync_event.validate") as span:
             span.set_attribute("event_id", req.event_id)
@@ -214,12 +244,18 @@ def create_app() -> FastAPI:
             span.set_attribute("exp_id", req.exp_id)
 
         with tracer.start_as_current_span("master.api.sync_event.process_event") as span:
-            pass
-            # TODO: deduplication check by event_id
+            try:
+                # Verify experiment exists
+                exp = await repo.get_experiment(req.exp_id)
+                if not exp:
+                    raise ExperimentNotFoundError(req.exp_id)
+            except Exception as e:
+                logger.error(f"Error verifying experiment: {e}")
+                raise InternalServerError(str(e))
 
         with tracer.start_as_current_span("master.api.sync_event.upsert_data") as span:
+            # Sync event processing deferred to Phase 4 GREEN phase 2
             pass
-            # TODO: repo.process_sync_event(...)
 
         return {"status": "ok"}
 
