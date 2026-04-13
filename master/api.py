@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from typing import Any, Generator
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from envelope.middleware.shared.envelopes import (
@@ -23,6 +24,15 @@ from envelope.middleware.shared.envelopes import (
     SyncEvent,
 )
 from master.controllers import LineageController
+from master.errors import (
+    CircularDependencyError,
+    ConflictError,
+    ExperimentNotFoundError,
+    InternalServerError,
+    MasterAPIError,
+    ValidationError,
+)
+from master.neo4j.client import Neo4jClient
 from master.observability.tracing import get_tracer, setup_tracing
 
 logger = logging.getLogger(__name__)
@@ -59,6 +69,25 @@ def create_app() -> FastAPI:
     # Auto-instrument FastAPI (OBSV-04: no double-instrumentation)
     FastAPIInstrumentor.instrument_app(app, excluded_urls=".*health.*|.*metrics.*")
 
+    # --- Error Handlers ---
+
+    @app.exception_handler(MasterAPIError)
+    async def handle_master_api_error(request, exc: MasterAPIError):
+        """Handle MasterAPIError with appropriate HTTP status code."""
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message},
+        )
+
+    @app.exception_handler(Exception)
+    async def handle_generic_error(request, exc: Exception):
+        """Handle unexpected errors."""
+        logger.exception("Unexpected error", exc_info=exc)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+
     # --- Health Check Endpoint ---
 
     @app.get("/health")
@@ -77,13 +106,22 @@ def create_app() -> FastAPI:
         - master.api.handshake.determine_strategy
         """
         tracer = get_tracer()
+        neo4j_client = Neo4jClient.get_instance()
+        repo = neo4j_client.repository
 
         # Span 1: lookup_experiment
         with tracer.start_as_current_span("master.api.handshake.lookup_experiment") as span:
             span.set_attribute("recipe_id", req.recipe_id)
             span.set_attribute("config_hash", req.config_hash)
-            # TODO: db.find_experiment_by_hashes(req)
-            existing_exp = None
+            try:
+                existing_exp = await repo.find_experiment_by_hashes(
+                    config_hash=req.config_hash,
+                    code_hash=req.code_hash,
+                    req_hash=req.req_hash,
+                )
+            except Exception as e:
+                logger.error(f"Error looking up experiment: {e}", exc_info=e)
+                existing_exp = None
 
         # Span 2: determine_strategy
         with tracer.start_as_current_span("master.api.handshake.determine_strategy") as span:
