@@ -204,11 +204,13 @@ def create_app() -> FastAPI:
             if req.checkpoint_id:
                 span.set_attribute("ckp_id", req.checkpoint_id)
             try:
+                # Map error_message to exit_message, status to exit_code
+                exit_code = 1 if req.status == "failed" else (0 if req.status == "done" else None)
                 await repo.update_experiment_status(
                     exp_id=req.exp_id,
                     status=req.status,
-                    exit_code=req.exit_code,
-                    exit_message=req.exit_message,
+                    exit_code=exit_code,
+                    exit_message=req.error_message,
                 )
             except Exception as e:
                 logger.error(f"Error updating status: {e}")
