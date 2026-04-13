@@ -163,7 +163,7 @@ def create_app() -> FastAPI:
                     ckp_id=req.ckp_id,
                     epoch=req.epoch or 0,
                     run=req.run or 0,
-                    metrics_snapshot=req.metrics or {},
+                    metrics_snapshot=req.metrics_snapshot or {},
                     uri=req.uri,
                 )
             except Exception as e:
