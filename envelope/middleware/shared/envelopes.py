@@ -73,6 +73,17 @@ class CheckpointPush(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
 
 
+class StatusUpdate(BaseModel):
+    """Worker to Master status update for experiment lifecycle."""
+
+    exp_id: str
+    checkpoint_id: str | None = None
+    status: str  # setup, training, validation, done, failed
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    error_message: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
 class SyncEvent(BaseModel):
     """Worker to Master async event."""
 
