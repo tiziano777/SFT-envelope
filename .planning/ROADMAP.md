@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Shared Layer** - Pydantic dataclasses, enums, ConfigHasher, DiffEngine, and transport envelopes
 - [x] **Phase 2: Database Layer** - Neo4j schema, APOC triggers, driver, and repository with atomic Cypher queries
 - [x] **Phase 3: Observability** - Phoenix tracing setup, OTEL integration, and Docker service
-- [ ] **Phase 4: Master API + Infrastructure** - FastAPI endpoints, LineageController, auth middleware, Docker Compose, Makefile
+- [x] **Phase 4: Master API + Infrastructure** - FastAPI endpoints, LineageController, auth middleware, Docker Compose, Makefile
 - [x] **Phase 5: Storage Layer** - BaseStorageWriter ABC, URIResolver, LocalStorage, and S3/NFS stubs
 - [ ] **Phase 6: Worker Layer** - Connections, local persistence, filesystem watcher, async pusher, and daemon
 - [ ] **Phase 7: Generator Integration** - inject_worker_middleware, run.sh.j2 daemon lifecycle, merge scaffold
@@ -121,9 +121,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
+- [x] 06-01-PLAN.md — Daemon core: bootstrap, state persistence (WorkerDaemon, WorkerState)
+- [x] 06-02-PLAN.md — Connection layer: BaseConnection ABC, HTTP, SSH stubs
+- [x] 06-03-PLAN.md — Async pushing: watcher, AsyncPusher, exponential backoff
 
 ### Phase 7: Generator Integration
 **Goal**: Generated scaffolds include Worker middleware automatically, and merge scaffolds are producible as a new technique
@@ -153,7 +153,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 08-01: TBD
+- [x] 08-01-PLAN.md — Datamix config: DatamixSource, DatamixLoader, multi-source + replica oversampling
 
 ### Phase 9: Testing
 **Goal**: Full end-to-end test suite validates the Worker-Master lineage flow across all branching scenarios and failure modes
@@ -196,10 +196,10 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 | 1. Shared Layer | 2/2 | Complete | 2026-04-10 |
 | 2. Database Layer | 2/2 | Complete | 2026-04-11 |
 | 3. Observability | 1/1 | Complete | 2026-04-13 |
-| 4. Master API + Infrastructure | 0/3 | Not started | - |
+| 4. Master API + Infrastructure | 3/3 | Complete | 2026-04-13 |
 | 5. Storage Layer | 1/1 | Complete | 2026-04-13 |
-| 6. Worker Layer | 0/3 | Not started | - |
+| 6. Worker Layer | 3/3 | Planned | In execution |
 | 7. Generator Integration | 0/2 | Not started | - |
-| 8. Datamix | 0/1 | Not started | - |
+| 8. Datamix | 1/1 | Planned | In execution |
 | 9. Testing | 0/2 | Not started | - |
 | 10. Documentation | 0/1 | Not started | - |
