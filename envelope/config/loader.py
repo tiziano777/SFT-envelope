@@ -37,7 +37,8 @@ def merge_technique_defaults(data: dict[str, Any]) -> dict[str, Any]:
     technique = data.get("training", {}).get("technique")
     if technique:
         try:
-            technique_obj = technique_registry.get(technique)
+            technique_cls = technique_registry.get(technique)
+            technique_obj = technique_cls()  # Instantiate the class
             defaults = technique_obj.default_technique_args()
             existing_args = data.get("training", {}).get("technique_args", {})
             merged = {**defaults, **existing_args}

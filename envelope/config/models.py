@@ -19,6 +19,7 @@ class Stage(int, Enum):
     SFT = 1
     PREFERENCE = 2
     RL = 3
+    MERGE = 4
 
 
 class Technique(str, Enum):

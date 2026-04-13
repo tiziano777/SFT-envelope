@@ -27,6 +27,29 @@ from envelope.techniques.base import BaseTechnique
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
+def inject_worker_middleware(output_dir: Path) -> None:
+    """Copy envelope/middleware/ tree into output_dir/middleware/ for daemon coordination.
+
+    Copies:
+    - envelope/middleware/worker/ → setup_{name}/middleware/worker/
+    - envelope/middleware/shared/ → setup_{name}/middleware/shared/
+    - envelope/middleware/__init__.py → setup_{name}/middleware/__init__.py
+
+    This makes the daemon available without manual setup.
+    """
+    middleware_src = Path(__file__).parent.parent / "middleware"
+    middleware_dst = output_dir / "middleware"
+
+    if middleware_src.exists():
+        # Remove destination if it exists (idempotent)
+        if middleware_dst.exists():
+            shutil.rmtree(middleware_dst)
+        # Copy entire middleware tree
+        shutil.copytree(middleware_src, middleware_dst)
+    else:
+        raise FileNotFoundError(f"Source middleware not found: {middleware_src}")
+
+
 def generate_setup(
     config_path: str | Path,
     name: str,
@@ -125,6 +148,9 @@ def generate_setup(
 
     # Copy runtime diagnostics module
     _copy_diagnostics(output_dir)
+
+    # Step 16: Inject worker middleware
+    inject_worker_middleware(output_dir)
 
     # Make run.sh executable
     (output_dir / "run.sh").chmod(0o755)
