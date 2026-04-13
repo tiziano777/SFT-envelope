@@ -1,0 +1,111 @@
+"""Experiment management page."""
+
+from __future__ import annotations
+
+import asyncio
+
+import streamlit as st
+
+from streamlit_ui.crud.experiment_manager import ExperimentManager
+from streamlit_ui.errors import DeleteProtectionError, UIError
+from streamlit_ui.utils.caching import get_api_client, get_neo4j_client
+
+
+def run() -> None:
+    """Run experiment management page."""
+    st.title("Experiment Management")
+
+    db_client = get_neo4j_client()
+    api_client = get_api_client()
+    manager = ExperimentManager(db_client, api_client)
+
+    tab_create, tab_browse, tab_edit = st.tabs(["Create", "Browse", "Edit"])
+
+    with tab_create:
+        st.subheader("Create New Experiment")
+        with st.form("create_experiment_form"):
+            model_id = st.text_input("Model ID", placeholder="UUID")
+            status = st.selectbox("Status", ["PENDING", "RUNNING", "COMPLETED", "FAILED"])
+            description = st.text_area("Description", value="")
+            submitted = st.form_submit_button("Create Experiment")
+
+            if submitted:
+                if not model_id.strip():
+                    st.error("Model ID is required")
+                else:
+                    try:
+                        result = asyncio.run(
+                            manager.create_experiment(
+                                model_id=model_id,
+                                status=status,
+                                description=description,
+                            )
+                        )
+                        st.success(f"✓ Experiment '{result['exp_id']}' created successfully!")
+                        st.toast("Experiment created!", icon="✓")
+                    except UIError as e:
+                        st.error(f"Error: {e.user_message}")
+
+    with tab_browse:
+        st.subheader("Browse Experiments")
+        status_filter = st.selectbox(
+            "Filter by Status",
+            ["All", "PENDING", "RUNNING", "COMPLETED", "FAILED"],
+        )
+
+        try:
+            filter_val = None if status_filter == "All" else status_filter
+            experiments = asyncio.run(manager.list_experiments(status=filter_val))
+
+            if experiments:
+                for exp in experiments:
+                    with st.container(border=True):
+                        col1, col2, col3 = st.columns([2, 2, 2])
+                        with col1:
+                            st.write(f"**{exp.get('exp_id', 'N/A')}**")
+                        with col2:
+                            st.caption(f"Status: {exp.get('status', 'N/A')}")
+                        with col3:
+                            st.caption(f"Created: {exp.get('created_at', 'N/A')}")
+            else:
+                st.info("No experiments found.")
+        except UIError as e:
+            st.error(f"Error: {e.user_message}")
+
+    with tab_edit:
+        st.subheader("Update Experiment")
+        try:
+            experiments = asyncio.run(manager.list_experiments())
+            exp_map = {e["exp_id"]: e["id"] for e in experiments}
+
+            selected_exp = st.selectbox("Select Experiment", list(exp_map.keys()))
+
+            if selected_exp:
+                exp_id = exp_map[selected_exp]
+                exp = asyncio.run(manager.get_experiment(exp_id))
+
+                with st.form("edit_experiment_form"):
+                    status = st.selectbox(
+                        "Status",
+                        ["PENDING", "RUNNING", "COMPLETED", "FAILED"],
+                        index=["PENDING", "RUNNING", "COMPLETED", "FAILED"].index(
+                            exp.get("status", "PENDING")
+                        ),
+                    )
+                    description = st.text_area("Description", value=exp.get("description", ""))
+                    submitted = st.form_submit_button("Update Experiment")
+
+                    if submitted:
+                        try:
+                            asyncio.run(
+                                manager.update_experiment(
+                                    exp_id,
+                                    status=status,
+                                    description=description,
+                                )
+                            )
+                            st.success("✓ Experiment updated!")
+                        except UIError as e:
+                            st.error(f"Error: {e.user_message}")
+        except UIError as e:
+            st.error(f"Error: {e.user_message}")
