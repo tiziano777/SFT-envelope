@@ -72,10 +72,10 @@ Plans:
   2. setup_tracing() succeeds silently when Phoenix is unreachable (no crash, no hang, no error propagation)
   3. get_tracer() returns a functional tracer when OTEL is available, and a no-op fallback otherwise
   4. FastAPI auto-instrumentation is active without double-instrumentation, and manual spans exist on critical endpoints (handshake, checkpoint_push, status_update, merge, sync_event)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md — OTEL tracing setup, FastAPI auto-instrumentation, manual spans on 5 critical endpoints, graceful degradation, integration tests with Phoenix
 
 ### Phase 4: Master API + Infrastructure
 **Goal**: Master API accepts Worker requests over HTTP, applies lineage logic, and runs in Docker with all supporting services
@@ -195,7 +195,7 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 |-------|----------------|--------|-----------|
 | 1. Shared Layer | 2/2 | Complete | 2026-04-10 |
 | 2. Database Layer | 0/2 | Not started | - |
-| 3. Observability | 0/1 | Not started | - |
+| 3. Observability | 1/1 | Planned | - |
 | 4. Master API + Infrastructure | 0/3 | Not started | - |
 | 5. Storage Layer | 0/1 | Not started | - |
 | 6. Worker Layer | 0/3 | Not started | - |
