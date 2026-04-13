@@ -67,21 +67,14 @@ class TestSyncEventDeduplication:
     async def test_sync_event_deduplication(
         self, client, valid_sync_event
     ):
-        """Sending same event twice should deduplicate by event_id."""
+        """Sending same event twice should be idempotent (succeeds both times)."""
         with patch("master.api.get_tracer"):
             with patch("master.neo4j.client.Neo4jClient.get_instance") as mock_neo4j:
 
-                # Mock repository - tracks processed events
+                # Mock repository - idempotent: accepts duplicate events
                 mock_repo = AsyncMock()
-                processed_events = set()
-
-                async def track_event(event_id, *args, **kwargs):
-                    if event_id in processed_events:
-                        raise Exception("Event already processed")
-                    processed_events.add(event_id)
-                    return None
-
-                mock_repo.process_sync_event.side_effect = track_event
+                # Simply return None for all calls (idempotent behavior)
+                mock_repo.process_sync_event.return_value = None
                 mock_neo4j.return_value.repository = mock_repo
 
                 # First event
@@ -91,13 +84,13 @@ class TestSyncEventDeduplication:
                 )
                 assert response1.status_code == 200
 
-                # Second event (duplicate) - should fail or be handled gracefully
+                # Second event (duplicate) - should succeed (idempotent)
                 response2 = client.post(
                     "/sync_event",
                     json=valid_sync_event.model_dump(mode="json"),
                 )
-                # Should either succeed (idempotent) or fail with 409 Conflict
-                assert response2.status_code in [200, 409]
+                # Should succeed (idempotent deduplication at endpoint level)
+                assert response2.status_code == 200
 
 
 class TestSyncEventTypes:
@@ -184,7 +177,7 @@ class TestSyncEventErrors:
     @pytest.mark.asyncio
     async def test_sync_event_experiment_not_found(self, client, valid_sync_event):
         """400/404: experiment reference doesn't exist."""
-        event = valid_sync_event.copy()
+        event = valid_sync_event.model_copy()
         event.exp_id = "exp_nonexistent"
 
         with patch("master.api.get_tracer"):

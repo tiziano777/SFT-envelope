@@ -82,8 +82,8 @@ class TestMergeLineageValidation:
 
                 # Mock repository
                 mock_repo = AsyncMock()
-                # Simulate ConsistencyGuard detecting cycle
-                mock_repo.validate_lineage.side_effect = Exception("Circular dependency detected")
+                # create_merged_checkpoint handles cycle detection internally
+                mock_repo.create_merged_checkpoint.side_effect = Exception("Circular dependency detected")
                 mock_neo4j.return_value.repository = mock_repo
 
                 response = client.post(
@@ -91,7 +91,7 @@ class TestMergeLineageValidation:
                     json=merge_request,
                 )
 
-                # Should fail with 409 Conflict
+                # Should fail with 409 Conflict or 500 Internal Server Error
                 assert response.status_code in [409, 500]
 
 
@@ -124,7 +124,7 @@ class TestMergeErrors:
 
                 # Mock repository - experiment not found
                 mock_repo = AsyncMock()
-                mock_repo.find_experiment_by_id.return_value = None
+                mock_repo.get_experiment.return_value = None
                 mock_neo4j.return_value.repository = mock_repo
 
                 response = client.post(
@@ -132,8 +132,8 @@ class TestMergeErrors:
                     json=merge_request,
                 )
 
-                # Should fail with 404 or validation error
-                assert response.status_code in [404, 422]
+                # Should fail with 404
+                assert response.status_code == 404
 
 
 class TestMergeManualSpans:

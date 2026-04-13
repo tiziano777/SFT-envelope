@@ -29,11 +29,10 @@ class TestErrorResponses:
         """404 Not Found for missing experiment."""
         with patch("master.api.get_tracer"):
             with patch("master.neo4j.client.Neo4jClient.get_instance") as mock_neo4j:
-                import asyncio
                 from unittest.mock import AsyncMock
 
                 mock_repo = AsyncMock()
-                mock_repo.find_experiment_by_id = AsyncMock(return_value=None)
+                mock_repo.get_experiment = AsyncMock(return_value=None)
                 mock_neo4j.return_value.repository = mock_repo
 
                 # Attempting to access nonexistent experiment
@@ -44,8 +43,8 @@ class TestErrorResponses:
                         "status": "training",
                     },
                 )
-                # Should not return 200 for missing experiment
-                assert response.status_code != 200
+                # Should return 404 for missing experiment
+                assert response.status_code == 404
 
     def test_409_conflict_circular_dependency(self, client):
         """409 Conflict for circular dependency in merge."""

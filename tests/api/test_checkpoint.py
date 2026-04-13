@@ -139,7 +139,7 @@ class TestCheckpointPushArtifacts:
         """Checkpoint push with artifact URI."""
         with patch("master.api.get_tracer"):
             with patch("master.neo4j.client.Neo4jClient.get_instance") as mock_neo4j, \
-                 patch("master.storage.resolver.URIResolver") as mock_storage:
+                 patch("master.api.URIResolver") as mock_storage_cls:
 
                 # Mock repository
                 mock_repo = AsyncMock()
@@ -148,8 +148,10 @@ class TestCheckpointPushArtifacts:
                 )
                 mock_neo4j.return_value.repository = mock_repo
 
-                # Mock storage - artifact exists
-                mock_storage.return_value.file_exists.return_value = True
+                # Mock storage instance and file_exists method
+                mock_storage_instance = MagicMock()
+                mock_storage_instance.file_exists.return_value = True
+                mock_storage_cls.return_value = mock_storage_instance
 
                 response = client.post(
                     "/checkpoint_push",
@@ -157,8 +159,8 @@ class TestCheckpointPushArtifacts:
                 )
 
                 assert response.status_code == 200
-                # Verify file_exists was called
-                mock_storage.return_value.file_exists.assert_called()
+                # Verify file_exists was called with the URI
+                mock_storage_instance.file_exists.assert_called_with(valid_checkpoint_push.uri)
 
 
     @pytest.mark.asyncio
