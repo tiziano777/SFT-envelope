@@ -1,21 +1,32 @@
-.PHONY: help master-up master-down master-logs master-test master-shell master-reset neo4j-shell
+.PHONY: help master-up master-down master-logs master-test master-shell master-reset neo4j-shell streamlit-up streamlit-down streamlit-logs streamlit-shell stack-up stack-down health-check
 
 help:
 	@echo "FineTuning-Envelope Lineage System — Master Infrastructure"
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Targets:"
-	@echo "  master-up          Start all services (Neo4j + Phoenix + Master API)"
-	@echo "  master-down        Stop all services gracefully"
-	@echo "  master-reset       Stop services and remove volumes (⚠️ data loss)"
-	@echo "  master-logs        Stream logs from all services"
+	@echo "Master Targets:"
+	@echo "  master-up          Start Master services (Neo4j + Phoenix + Master API)"
+	@echo "  master-down        Stop Master services gracefully"
+	@echo "  master-reset       Stop Master and remove volumes (⚠️ data loss)"
+	@echo "  master-logs        Stream logs from Master services"
 	@echo "  master-logs-neo4j  Stream logs from Neo4j only"
 	@echo "  master-logs-phoenix Stream logs from Phoenix only"
 	@echo "  master-logs-api    Stream logs from Master API only"
 	@echo "  master-test        Run lineage tests with Docker (requires master-up)"
 	@echo "  master-shell       Open shell in Neo4j container"
-	@echo "  master-status      Show service status"
+	@echo "  master-status      Show Master service status"
+	@echo ""
+	@echo "Streamlit Targets:"
+	@echo "  streamlit-up       Start Streamlit UI container"
+	@echo "  streamlit-down     Stop Streamlit UI container"
+	@echo "  streamlit-logs     Stream logs from Streamlit"
+	@echo "  streamlit-shell    Open shell in Streamlit container"
+	@echo ""
+	@echo "Stack Targets:"
+	@echo "  stack-up           Start all services (Neo4j + Phoenix + Master + Streamlit)"
+	@echo "  stack-down         Stop all services gracefully"
+	@echo "  health-check       Verify all services are healthy"
 	@echo ""
 
 master-up:
@@ -88,6 +99,51 @@ type-check:
 
 dev-setup:
 	pip install -e ".[dev,test,master]"
+
+# CI targets
+streamlit-up:
+	@echo "🚀 Starting Streamlit UI..."
+	docker-compose up -d streamlit
+	@echo "✅ Streamlit started on http://localhost:8501"
+
+streamlit-down:
+	@echo "⏹️  Stopping Streamlit..."
+	docker-compose down streamlit
+	@echo "✅ Streamlit stopped"
+
+streamlit-logs:
+	docker-compose logs -f streamlit
+
+streamlit-shell:
+	docker-compose exec streamlit /bin/bash
+
+stack-up:
+	@echo "🚀 Starting full stack (Neo4j + Phoenix + Master API + Streamlit)..."
+	docker-compose up -d
+	@echo "✅ Full stack started"
+	@echo ""
+	@echo "Access points:"
+	@echo "  Neo4j Browser:    http://localhost:7474 (neo4j/password)"
+	@echo "  Phoenix UI:       http://localhost:6006"
+	@echo "  Master API:       http://localhost:8000"
+	@echo "  Streamlit UI:     http://localhost:8501"
+
+stack-down:
+	@echo "⏹️  Stopping full stack..."
+	docker-compose down
+	@echo "✅ Full stack stopped"
+
+health-check:
+	@echo "🏥 Checking service health..."
+	@echo ""
+	@echo "Neo4j:"
+	docker-compose exec -T neo4j cypher-shell -u neo4j -p password "RETURN 1" && echo "✓ Neo4j OK" || echo "✗ Neo4j FAILED"
+	@echo ""
+	@echo "Master API:"
+	curl -s http://localhost:8000/health && echo -e "\n✓ Master API OK" || echo "✗ Master API FAILED"
+	@echo ""
+	@echo "Streamlit:"
+	curl -s http://localhost:8501/_stcore/health && echo -e "\n✓ Streamlit OK" || echo "✗ Streamlit FAILED"
 
 # CI targets
 ci-test: master-up test-constraints test-triggers test-driver test-repository
