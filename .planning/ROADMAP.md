@@ -25,9 +25,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Observability** - Phoenix tracing setup, OTEL integration, and Docker service
 - [x] **Phase 4: Master API + Infrastructure** - FastAPI endpoints, LineageController, auth middleware, Docker Compose, Makefile
 - [x] **Phase 5: Storage Layer** - BaseStorageWriter ABC, URIResolver, LocalStorage, and S3/NFS stubs
-- [ ] **Phase 6: Worker Layer** - Connections, local persistence, filesystem watcher, async pusher, and daemon
+- [x] **Phase 6: Worker Layer** - Connections, local persistence, filesystem watcher, async pusher, and daemon
 - [ ] **Phase 7: Generator Integration** - inject_worker_middleware, run.sh.j2 daemon lifecycle, merge scaffold
-- [ ] **Phase 8: Datamix** - Multi-source config, DatamixLoader, replica oversampling, backward compatibility
+- [x] **Phase 8: Datamix** - Multi-source config, DatamixLoader, replica oversampling, backward compatibility
 - [ ] **Phase 9: Testing** - E2E suite with simulate_worker/master, handshake/checkpoint/config/daemon tests
 - [ ] **Phase 10: Documentation** - Update workflow.md, README, existing docs, and new lineage docs
 
@@ -57,11 +57,11 @@ Plans:
   2. APOC triggers automatically set created_at/updated_at timestamps and validate against orphan checkpoints (except is_merging=true)
   3. ExperimentRepository creates, queries, and upserts experiments and checkpoints via idempotent Cypher queries
   4. find_experiment_by_hashes returns the existing experiment for matching config hashes, and get_latest_checkpoint returns the most recent checkpoint for RESUME logic
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [x] 02-01-PLAN.md — Neo4j schema: unique constraints, APOC triggers, node initialization
+- [x] 02-02-PLAN.md — Repository: ExperimentRepository with idempotent Cypher, find_experiment_by_hashes, get_latest_checkpoint
 
 ### Phase 3: Observability
 **Goal**: All Master API activity is traced and visible in Phoenix UI without manual per-request instrumentation
@@ -87,12 +87,12 @@ Plans:
   3. X-API-Key middleware rejects unauthenticated requests with 401
   4. ConsistencyGuard prevents circular lineage relationships (source != target, max depth 50)
   5. `make master-up` starts Neo4j + Phoenix + Master API via Docker Compose; `make master-down` stops them; `make master-logs` streams logs
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
+- [x] 04-01-PLAN.md — Master API: 5 critical endpoints, error handlers, manual spans, Neo4j integration
+- [x] 04-02-GREEN-PLAN.md — Test mock fixes: correct patch targets and return values
+- [x] 04-03-PLAN.md — Docker Compose, Makefile, infrastructure tests
 
 ### Phase 5: Storage Layer
 **Goal**: Master can persist and retrieve artifacts via URI-based dispatch to pluggable storage backends
@@ -103,10 +103,10 @@ Plans:
   2. URIResolver dispatches to the correct writer based on URI prefix (file://, s3://, nfs://, worker://, master://)
   3. S3 and NFS stubs raise NotImplementedError with a descriptive message
   4. URI prefix-to-writer mapping is configured via .env variables, not hardcoded
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 05-01: TBD
+- [x] 05-01-PLAN.md — Storage layer: BaseStorageWriter ABC, URIResolver dispatch, LocalStorage, S3/NFS stubs, integration tests
 
 ### Phase 6: Worker Layer
 **Goal**: Worker daemon runs alongside training, persists state locally, and pushes events to Master asynchronously with retry
@@ -118,7 +118,7 @@ Plans:
   3. WorkerState persists atomically (tmp + rename) and transfer_log.jsonl records every push attempt as an append-only audit trail
   4. Filesystem watcher (watchdog) detects changes in lineage/to_transfer/, training_metrics/, and config/rewards directories
   5. AsyncPusher uses a thread-safe queue with exponential backoff retry and deduplicates events by event_id
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 - [x] 06-01-PLAN.md — Daemon core: bootstrap, state persistence (WorkerDaemon, WorkerState)
@@ -135,11 +135,11 @@ Plans:
   3. Generated requirements.txt includes watchdog, httpx, and paramiko dependencies
   4. `envelope setup` with merge technique produces a merge.py scaffold with daemon --one-shot mode
   5. capability_matrix recognizes 'merge' as a valid no-GPU technique
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — inject_worker_middleware() in setup_generator.py, run.sh.j2 daemon lifecycle, requirements.txt.j2 worker deps
+- [ ] 07-02-PLAN.md — MergeTechnique plugin, merge.py.j2 template, capability_matrix merge entry, integration tests
 
 ### Phase 8: Datamix
 **Goal**: Config YAML supports multi-source dataset definitions with replica oversampling while preserving backward compatibility
@@ -150,7 +150,7 @@ Plans:
   2. DatamixLoader in prepare.py detects whether config uses datamix or single dataset and loads accordingly
   3. Replica field causes integer oversampling (dataset repeated N times in the training data)
   4. Existing configs with single dataset field continue to work without any modification
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [x] 08-01-PLAN.md — Datamix config: DatamixSource, DatamixLoader, multi-source + replica oversampling
@@ -165,11 +165,11 @@ Plans:
   3. Checkpoint push, idempotency (same event_id), and uri=NULL scenarios are explicitly covered
   4. Config change detection triggers branch strategy, verifying trigger hash on config.yaml, train.py, and rewards/*
   5. Test nodes use _TEST label and are cleaned up via DETACH DELETE after each test run
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 09-01-PLAN.md — E2E test suite: simulate_worker, simulate_master, lifecycle tests
+- [ ] 09-02-PLAN.md — Strategy tests: NEW, RESUME, BRANCH, RETRY with diff verification
 
 ### Phase 10: Documentation
 **Goal**: All existing and new documentation reflects the lineage system integration so users can understand and operate the full system
@@ -180,10 +180,10 @@ Plans:
   2. README.md has a Lineage System section explaining the Worker-Master architecture, setup, and usage
   3. Existing docs for generator and frameworks modules describe the middleware injection and merge technique changes
   4. New documentation exists for lineage-specific modules: middleware/shared, middleware/worker, and master
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 10-01: TBD
+- [ ] 10-01-PLAN.md — Documentation updates: workflow.md, README, module docs, lineage guides
 
 ## Progress
 
@@ -198,8 +198,8 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 | 3. Observability | 1/1 | Complete | 2026-04-13 |
 | 4. Master API + Infrastructure | 3/3 | Complete | 2026-04-13 |
 | 5. Storage Layer | 1/1 | Complete | 2026-04-13 |
-| 6. Worker Layer | 3/3 | Planned | In execution |
-| 7. Generator Integration | 0/2 | Not started | - |
-| 8. Datamix | 1/1 | Planned | In execution |
+| 6. Worker Layer | 3/3 | Complete | 2026-04-13 |
+| 7. Generator Integration | 2/2 | Planned | - |
+| 8. Datamix | 1/1 | Complete | 2026-04-13 |
 | 9. Testing | 0/2 | Not started | - |
 | 10. Documentation | 0/1 | Not started | - |
