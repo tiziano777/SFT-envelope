@@ -133,10 +133,22 @@ def create_app() -> FastAPI:
             exp_id = LineageController.exp_id_from_strategy(strategy, existing_exp, req)
             span.set_attribute("exp_id", exp_id)
 
+        # Span 4: fetch baseline checkpoint for RESUME
+        base_checkpoint_uri = None
+        if strategy == Strategy.RESUME and existing_exp:
+            with tracer.start_as_current_span("master.api.handshake.retrieve_baseline") as span:
+                try:
+                    latest_ckp = await repo.get_latest_checkpoint(existing_exp.exp_id)
+                    if latest_ckp:
+                        base_checkpoint_uri = latest_ckp.uri
+                        span.set_attribute("baseline_uri", base_checkpoint_uri)
+                except Exception as e:
+                    logger.warning(f"Could not retrieve baseline checkpoint: {e}")
+
         return HandshakeResponse(
             exp_id=exp_id,
             strategy=strategy,
-            base_checkpoint_uri=None,
+            base_checkpoint_uri=base_checkpoint_uri,
         )
 
     @app.post("/checkpoint_push")
