@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -14,7 +15,7 @@ from pydantic import BaseModel, Field
 class BaseNode(BaseModel):
     """Base for all Neo4j node types with shared fields."""
 
-    id: str = Field(..., min_length=1, description="UUID primary key")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="UUID primary key")
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

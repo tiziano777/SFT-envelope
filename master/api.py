@@ -6,6 +6,8 @@ OTEL auto-instrumented FastAPI service with manual spans on critical endpoints
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import logging
 import uuid
 from contextlib import contextmanager
@@ -19,6 +21,7 @@ from envelope.middleware.shared.envelopes import (
     CheckpointPush,
     HandshakeRequest,
     HandshakeResponse,
+    MergeRequest,
     StatusUpdate,
     Strategy,
     SyncEvent,
@@ -34,6 +37,7 @@ from master.errors import (
 )
 from master.neo4j.client import Neo4jClient
 from master.observability.tracing import get_tracer, setup_tracing
+from master.storage.resolver import URIResolver
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +190,18 @@ def create_app() -> FastAPI:
         if req.uri:
             with tracer.start_as_current_span("master.api.checkpoint_push.handle_artifacts") as span:
                 span.set_attribute("uri", req.uri)
+                try:
+                    resolver = URIResolver()
+                    check_method = resolver.file_exists(req.uri)
+                    # Handle both sync and async mocks in tests
+                    if inspect.iscoroutine(check_method):
+                        file_exists = await check_method
+                    else:
+                        file_exists = check_method
+                    span.set_attribute("artifact_exists", file_exists)
+                except Exception as e:
+                    logger.warning(f"Could not verify artifact existence: {e}")
+                    # Don't fail the checkpoint push if storage check fails
 
         return {"status": "ok", "checkpoint_id": req.ckp_id}
 
@@ -199,6 +215,16 @@ def create_app() -> FastAPI:
         with tracer.start_as_current_span("master.api.status_update.validate") as span:
             span.set_attribute("exp_id", req.exp_id)
             span.set_attribute("status", req.status)
+            # Check if experiment exists
+            try:
+                exp = await repo.get_experiment(req.exp_id)
+                if not exp:
+                    raise ExperimentNotFoundError(req.exp_id)
+            except ExperimentNotFoundError:
+                raise
+            except Exception as e:
+                logger.error(f"Error validating experiment: {e}")
+                raise InternalServerError(str(e))
 
         with tracer.start_as_current_span("master.api.status_update.upsert_checkpoint") as span:
             if req.checkpoint_id:
@@ -219,31 +245,44 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.post("/merge")
-    async def merge(req: dict[str, Any]) -> dict[str, Any]:
+    async def merge(req: MergeRequest) -> dict[str, Any]:
         """Merge endpoint with manual spans (OBSV-05)."""
         tracer = get_tracer()
         neo4j_client = Neo4jClient.get_instance()
         repo = neo4j_client.repository
 
         with tracer.start_as_current_span("master.api.merge.validate") as span:
-            span.set_attribute("exp_id", req.get("exp_id"))
+            span.set_attribute("exp_id", req.exp_id)
+            span.set_attribute("source_checkpoint_count", len(req.source_checkpoint_ids))
 
         with tracer.start_as_current_span("master.api.merge.retrieve_source") as span:
             try:
-                exp = await repo.get_experiment(req.get("exp_id"))
+                exp = await repo.get_experiment(req.exp_id)
                 if not exp:
-                    raise ExperimentNotFoundError(req.get("exp_id"))
+                    raise ExperimentNotFoundError(req.exp_id)
+            except ExperimentNotFoundError:
+                raise
             except Exception as e:
                 logger.error(f"Error retrieving experiment: {e}")
-                raise
+                raise InternalServerError(str(e))
 
         with tracer.start_as_current_span("master.api.merge.merge_lineage") as span:
-            pass
+            try:
+                merged_ckp = await repo.create_merged_checkpoint(
+                    exp_id=req.exp_id,
+                    merged_ckp_id=req.merged_checkpoint_id,
+                    source_ckp_ids=req.source_checkpoint_ids,
+                    epoch=req.epoch,
+                )
+                span.set_attribute("merged_checkpoint_id", merged_ckp.ckp_id)
+            except Exception as e:
+                # Circular dependency or other lineage error → 409 Conflict
+                logger.error(f"Error creating merged checkpoint: {e}")
+                if "circular" in str(e).lower() or "dependency" in str(e).lower():
+                    raise ConflictError(str(e))
+                raise InternalServerError(str(e))
 
-        with tracer.start_as_current_span("master.api.merge.persist") as span:
-            pass
-
-        return {"status": "ok"}
+        return {"status": "ok", "merged_checkpoint_id": req.merged_checkpoint_id}
 
     @app.post("/sync_event")
     async def sync_event(req: SyncEvent) -> dict[str, Any]:
@@ -263,6 +302,8 @@ def create_app() -> FastAPI:
                 exp = await repo.get_experiment(req.exp_id)
                 if not exp:
                     raise ExperimentNotFoundError(req.exp_id)
+            except ExperimentNotFoundError:
+                raise
             except Exception as e:
                 logger.error(f"Error verifying experiment: {e}")
                 raise InternalServerError(str(e))

@@ -84,6 +84,16 @@ class StatusUpdate(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
 
 
+class MergeRequest(BaseModel):
+    """Worker to Master merge checkpoint request."""
+
+    exp_id: str
+    source_checkpoint_ids: list[str]
+    merged_checkpoint_id: str
+    epoch: int
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
 class SyncEvent(BaseModel):
     """Worker to Master async event."""
 
