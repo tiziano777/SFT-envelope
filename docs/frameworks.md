@@ -167,7 +167,60 @@ sdft           x      -       -         -        -       -          -          -
 sdpo           x      -       -         -        -       -          -          -        -
 gold           x      -       -         -        -       -          -          -        -
 reward_modeling x     -       -         -        -       -          -          -        -
+merge          -      -       -         -        -       -          -          -        x
 ```
+
+### Merge Technique (CPU-only, Post-processing)
+
+**Nota**: La tecnica `merge` è una operazione di post-processing, non una tecnica di training. Non può essere utilizzata da sola per il training, ma serve a combinare checkpoint da esperimenti già completati.
+
+**Caratteristiche**:
+- **Type**: Post-processing operation (not a training technique)
+- **Infrastructure**: CPU-only (no GPU required)
+- **Use Case**: Combine N source checkpoints into a single merged checkpoint
+- **Example**: Merge checkpoints from 2+ experiments (different seeds, techniques, or configurations)
+- **Requirements**:
+  - Source checkpoints must have the same base model and architecture
+  - Lineage relations must be acyclic (no cycles in derived-from graph)
+  - Weights must sum to 1.0 (linear combination)
+
+**Supported by**:
+- **from_scratch**: Minimal Python script to load and merge weights
+- **TRL** (via external merge.py script, not via trainer)
+
+**Configuration example**:
+```yaml
+experiment:
+  name: "merged-experiment"
+
+training:
+  technique: "merge"
+  merge_method: "linear"  # linear (default), or custom callable
+
+# Merge-specific config
+merge:
+  source_exp_ids: ["e-001", "e-002", "e-003"]
+  weights: [0.2, 0.3, 0.5]  # Must sum to 1.0
+  output_uri: "master:///merged/exp_merged_001"
+```
+
+**Implementation** (`merge.py.j2`):
+Quando `technique: "merge"` è configurato, il generatore crea uno script `merge.py` che:
+1. Legge i checkpoint sorgente dalle loro URIs
+2. Carica i modelli (verifica compatibilità architettura)
+3. Estrae i pesi da ogni checkpoint
+4. Combina linearmente con i pesi specificati: `merged_weights = sum(w_i * weights[i] for i in sources)`
+5. Salva il checkpoint merged con output_uri
+6. Comunica con il Master API per registrare la relazione MERGED_FROM
+
+**Lineage Integration**:
+Il merge triggera l'API `/merge` del Master che:
+1. Valida che i source checkpoint abbiano lo stesso base model
+2. Controlla che non ci siano cicli nel lineage
+3. Crea un nuovo :Checkpoint node con relazioni MERGED_FROM verso i source checkpoints
+4. Traccia completamente l'operazione di merge nel grafo Neo4j
+
+Per dettagli su Neo4j schema e MERGED_FROM relation, vedi [`docs/lineage/schema.md`](lineage/schema.md).
 
 ### API
 

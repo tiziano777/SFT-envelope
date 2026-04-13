@@ -115,6 +115,153 @@ await resolver.write_file("s3://bucket/key", b"data")
 await resolver.read_file("unknown://path")
 ```
 
+### Master-Side Storage (Lineage Context)
+
+The Master API uses URIResolver to handle artifact URIs submitted by Workers during checkpoint push. This section explains Master-side artifact resolution in the context of the lineage system.
+
+#### URI Resolution During Handshake and Checkpoint Push
+
+When a Worker sends a `/checkpoint_push` request, it provides:
+- `exp_id`: Experiment ID from handshake
+- `ckp_id`: Checkpoint ID (e.g., "e-001_c5_r2")
+- `metrics`: Training metrics (JSON)
+- `uri`: Artifact URI where the checkpoint is stored (e.g., "file:///path/to/model.bin")
+
+The Master API dispatcher:
+
+1. **Validates the URI syntax** (must match `scheme://path` pattern)
+2. **Extracts the prefix** (e.g., `file` from `file://`)
+3. **Looks up the backend** from URIResolver
+4. **Calls the backend** to verify artifact existence (optional, for validation)
+5. **Stores the URI in Neo4j** Checkpoint node (not the artifact itself)
+
+#### Storage Backend Mapping
+
+Each URI prefix maps to a storage backend:
+
+| Prefix | Backend | Purpose | Status |
+|--------|---------|---------|--------|
+| `file://` | LocalStorageWriter | Local filesystem (Worker storage) | ✓ Implemented |
+| `s3://` | S3StorageWriter | S3-compatible object storage | Stub (TBD) |
+| `nfs://` | NFSStorageWriter | NFS remote storage | Stub (TBD) |
+| `worker://` | WorkerStorage (future) | Artifact stays on Worker (not copied) | Stub |
+| `master://` | MasterStorageWriter (future) | Artifact on Master node (merged checkpoints) | Stub |
+
+#### Configuration
+
+By default, all prefixes are supported. To restrict or customize, use the `URI_PREFIX_*` environment variables:
+
+```bash
+# Map file:// prefix to LocalStorageWriter
+export URI_PREFIX_FILE=local
+
+# Map s3:// prefix (not implemented yet)
+export URI_PREFIX_S3=s3
+
+# Map nfs:// prefix (not implemented yet)
+export URI_PREFIX_NFS=nfs
+```
+
+#### Workflows
+
+**RESUME Strategy Workflow:**
+```
+[Worker] train.py writes checkpoint to file:///checkpoints/ckp_5/model.bin
+         ↓
+[Worker] daemon reads URI and prepares CheckpointPush event
+         ↓
+[Network] POST /checkpoint_push
+         ↓
+[Master] URIResolver.get_writer("file:///checkpoints/ckp_5/model.bin")
+         ↓ Returns: LocalStorageWriter (based on file:// prefix)
+         ↓
+[Master] Creates Checkpoint node in Neo4j
+         ↓ Stores URI in checkpoint.uri (not copying artifact)
+         ↓
+[Worker] Checkpoint remains on GPU node (file:///checkpoints/...)
+         ↓ If RESUME detected, Master uses same exp_id
+```
+
+**MERGE Workflow:**
+```
+[Merge.py] reads source checkpoints via URIResolver
+          ├─ resolver.read_file(source1_uri) → LocalStorageWriter
+          ├─ resolver.read_file(source2_uri) → LocalStorageWriter
+          └─ resolver.read_file(source3_uri) → LocalStorageWriter
+          ↓
+[Merge.py] combines weights locally
+          ↓
+[Merge.py] writes merged checkpoint to master:///merged/ckp_merged_001
+          ↓ URI stored in Checkpoint node
+          ↓
+[Master API] creates MERGED_FROM relations to source checkpoints
+          ↓
+[Master] Neo4j graph updated with complete merge lineage
+```
+
+#### Code Example: URIResolver in Master API
+
+From `master/api.py`:
+
+```python
+from master.storage import URIResolver
+
+resolver = URIResolver()
+
+@app.post("/checkpoint_push")
+async def checkpoint_push(req: CheckpointPush):
+    """Receive checkpoint from Worker and validate URI."""
+
+    # Validate experiment exists
+    exp = await repository.get_experiment(req.exp_id)
+    if not exp:
+        raise NotFound("Experiment not found")
+
+    # Verify artifact exists (optional validation)
+    if req.uri:
+        tracer = get_tracer()
+        with tracer.start_as_current_span("master.checkpoint_push.verify_uri"):
+            writer = resolver.get_writer(req.uri)
+            exists = await writer.file_exists(req.uri)
+            if not exists:
+                raise BadRequest(f"Artifact not found at {req.uri}")
+
+    # Create checkpoint in Neo4j (URI stored, not artifact)
+    ckp = await repository.create_checkpoint(req)
+
+    return {"ckp_id": ckp.ckp_id, "created_at": ckp.created_at}
+```
+
+#### Extensibility: Adding Custom Backends
+
+To add support for a new storage backend (e.g., Azure Blob Storage):
+
+1. Implement `BaseStorageWriter` ABC:
+```python
+class AzureBlobStorageWriter(BaseStorageWriter):
+    async def read_file(self, uri: str) -> bytes: ...
+    async def write_file(self, uri: str, data: bytes) -> None: ...
+    async def file_exists(self, uri: str) -> bool: ...
+    async def delete_file(self, uri: str) -> None: ...
+```
+
+2. Register with URIResolver:
+```python
+resolver.register_backend("azure", AzureBlobStorageWriter())
+```
+
+3. Configure environment:
+```bash
+export URI_PREFIX_AZURE=azure
+```
+
+4. Workers can now use:
+```bash
+uri: "azure://mycontainer/checkpoints/ckp_1/model.bin"
+```
+
+See Phase 5 (Storage Layer) for full implementation details.
+
 ## Configuration
 
 ### Default Backends

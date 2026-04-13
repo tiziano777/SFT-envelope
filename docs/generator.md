@@ -183,6 +183,132 @@ setup_grpo-math-v1/
 
 A runtime, `prepare.py` crea una directory `data_cache/` per il caching idempotente dei dataset preprocessati.
 
+### Worker Middleware Injection (Step 16)
+
+**Fase 7** (Generator Integration) aggiunge un passo cruciale alla pipeline di generazione: **step 16 — Worker Middleware Injection**.
+
+Questo passo esegue la funzione `inject_worker_middleware(setup_dir)` dopo il rendering di tutti i template. Il suo compito:
+
+1. **Copia i moduli worker dal progetto envelope** nel setup generato:
+   - `envelope/middleware/worker/` → `setup_{name}/worker/`
+   - `envelope/middleware/shared/` → `setup_{name}/shared/`
+
+2. **Aggiorna requirements.txt** aggiungendo tre dipendenze critiche:
+   - `watchdog` — Monitora filesystem (lineage/to_transfer/, training_metrics/)
+   - `httpx` — Client HTTP asincrono per comunicazione Master
+   - `paramiko` — SSH per connessioni remote (future)
+
+#### Codice di referenza
+
+La funzione `inject_worker_middleware()` in `setup_generator.py`:
+
+```python
+def inject_worker_middleware(setup_dir: Path) -> None:
+    """Copy envelope/middleware/ to setup_{name}/.
+
+    Creates:
+    - setup/{name}/worker/ (daemon, connection, pusher)
+    - setup/{name}/shared/ (state models, connection models)
+    - Updates requirements.txt with watchdog, httpx, paramiko
+
+    Idempotent: safe to re-run.
+    """
+    middleware_src = Path(__file__).parent.parent / "middleware"
+
+    # Copy worker modules
+    worker_src = middleware_src / "worker"
+    worker_dst = setup_dir / "worker"
+    if not worker_dst.exists():
+        shutil.copytree(worker_src, worker_dst)
+
+    # Copy shared models
+    shared_src = middleware_src / "shared"
+    shared_dst = setup_dir / "shared"
+    if not shared_dst.exists():
+        shutil.copytree(shared_src, shared_dst)
+
+    # Update requirements.txt
+    req_file = setup_dir / "requirements.txt"
+    existing = req_file.read_text() if req_file.exists() else ""
+    new_reqs = ["watchdog>=4.0", "httpx>=0.27", "paramiko>=3.0"]
+
+    for req in new_reqs:
+        if req not in existing:
+            existing += f"\n{req}\n"
+
+    req_file.write_text(existing)
+```
+
+#### Struttura creata
+
+```
+envelope/middleware/
+├── shared/
+│   ├── models.py      (WorkerState, TransferLogEntry, ConnectionModels)
+│   └── __init__.py
+└── worker/
+    ├── daemon.py      (WorkerDaemon class)
+    ├── connection.py  (BaseConnection, HTTPConnection, SSHConnection)
+    ├── pusher.py      (AsyncPusher, queue + retry)
+    └── __init__.py
+
+↓ (step 16) inject_worker_middleware() ↓
+
+setup_{name}/
+├── worker/            (copia di envelope/middleware/worker/)
+│   ├── daemon.py
+│   ├── connection.py
+│   ├── pusher.py
+│   └── __init__.py
+├── shared/            (copia di envelope/middleware/shared/)
+│   ├── models.py
+│   ├── state.py
+│   └── __init__.py
+├── prepare.py
+├── train.py
+├── run.sh
+├── requirements.txt   (+ watchdog, httpx, paramiko aggiunti)
+└── config.yaml
+```
+
+#### Perche' serve
+
+Ogni setup generato e' autocontenuto. Include tutto il necessario per lanciare un training senza dipendere da installazioni globali. Il worker daemon e le utility condivise sono fondamentali per:
+- **Handshake**: comunicazione iniziale col Master per ottenere experiment_id
+- **Checkpoint tracking**: watchdog monitora i checkpoint scritti durante il training
+- **Async push**: daemon invia checkpoints al Master in background con retry
+
+#### Idempotenza
+
+Il passo 16 e' **idempotente**:
+- Usa `os.path.exists()` prima di copiare
+- Se le directory worker/ e shared/ gia' esistono, salta la copia
+- Sicuro da eseguire piu' volte sullo stesso setup
+
+#### Uso in run.sh
+
+Il file `run.sh.j2` generato usa i moduli iniettati:
+
+```bash
+# Avvia il worker daemon in background
+python -m worker.daemon &
+DAEMON_PID=$!
+echo $DAEMON_PID > .daemon.pid
+
+# Attendi handshake completato
+while [ ! -f ".handshake_done" ] && [ $ELAPSED -lt 30 ]; do
+    sleep 1
+    ELAPSED=$((ELAPSED + 1))
+done
+
+# Esegui training
+python train.py ...
+```
+
+Vedi `workflow.md` "FASE 16" per la descrizione completa del daemon lifecycle e della comunicazione Master-Worker.
+
+---
+
 ### Proprieta' della directory
 
 - **Autocontenuta**: tutto il necessario per il training e' dentro la cartella
