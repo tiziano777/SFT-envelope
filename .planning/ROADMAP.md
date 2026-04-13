@@ -21,10 +21,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 - Wave 6: Phase 10
 
 - [x] **Phase 1: Shared Layer** - Pydantic dataclasses, enums, ConfigHasher, DiffEngine, and transport envelopes
-- [ ] **Phase 2: Database Layer** - Neo4j schema, APOC triggers, driver, and repository with atomic Cypher queries
+- [x] **Phase 2: Database Layer** - Neo4j schema, APOC triggers, driver, and repository with atomic Cypher queries
 - [x] **Phase 3: Observability** - Phoenix tracing setup, OTEL integration, and Docker service
 - [ ] **Phase 4: Master API + Infrastructure** - FastAPI endpoints, LineageController, auth middleware, Docker Compose, Makefile
-- [ ] **Phase 5: Storage Layer** - BaseStorageWriter ABC, URIResolver, LocalStorage, and S3/NFS stubs
+- [x] **Phase 5: Storage Layer** - BaseStorageWriter ABC, URIResolver, LocalStorage, and S3/NFS stubs
 - [ ] **Phase 6: Worker Layer** - Connections, local persistence, filesystem watcher, async pusher, and daemon
 - [ ] **Phase 7: Generator Integration** - inject_worker_middleware, run.sh.j2 daemon lifecycle, merge scaffold
 - [ ] **Phase 8: Datamix** - Multi-source config, DatamixLoader, replica oversampling, backward compatibility
@@ -194,10 +194,10 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Shared Layer | 2/2 | Complete | 2026-04-10 |
-| 2. Database Layer | 0/2 | Not started | - |
+| 2. Database Layer | 2/2 | Complete | 2026-04-11 |
 | 3. Observability | 1/1 | Complete | 2026-04-13 |
 | 4. Master API + Infrastructure | 0/3 | Not started | - |
-| 5. Storage Layer | 0/1 | Not started | - |
+| 5. Storage Layer | 1/1 | Complete | 2026-04-13 |
 | 6. Worker Layer | 0/3 | Not started | - |
 | 7. Generator Integration | 0/2 | Not started | - |
 | 8. Datamix | 0/1 | Not started | - |
