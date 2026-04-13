@@ -309,8 +309,17 @@ def create_app() -> FastAPI:
                 raise InternalServerError(str(e))
 
         with tracer.start_as_current_span("master.api.sync_event.upsert_data") as span:
-            # Sync event processing deferred to Phase 4 GREEN phase 2
-            pass
+            try:
+                # Process the sync event in the repository
+                await repo.process_sync_event(
+                    event_id=req.event_id,
+                    event_type=req.event_type,
+                    exp_id=req.exp_id,
+                    payload=req.payload,
+                )
+            except Exception as e:
+                logger.error(f"Error processing sync event: {e}")
+                raise InternalServerError(str(e))
 
         return {"status": "ok"}
 
