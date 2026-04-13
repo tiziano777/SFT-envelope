@@ -1,49 +1,97 @@
-.PHONY: setup validate techniques frameworks compatible help
+.PHONY: help master-up master-down master-logs master-test master-shell master-reset neo4j-shell
 
-# ─── Setup Generation ───
+help:
+	@echo "FineTuning-Envelope Lineage System — Master Infrastructure"
+	@echo ""
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  master-up          Start all services (Neo4j + Phoenix + Master API)"
+	@echo "  master-down        Stop all services gracefully"
+	@echo "  master-reset       Stop services and remove volumes (⚠️ data loss)"
+	@echo "  master-logs        Stream logs from all services"
+	@echo "  master-logs-neo4j  Stream logs from Neo4j only"
+	@echo "  master-logs-phoenix Stream logs from Phoenix only"
+	@echo "  master-logs-api    Stream logs from Master API only"
+	@echo "  master-test        Run lineage tests with Docker (requires master-up)"
+	@echo "  master-shell       Open shell in Neo4j container"
+	@echo "  master-status      Show service status"
+	@echo ""
 
-setup: ## Generate a setup directory. Usage: make setup NAME=my-exp CONFIG=configs/examples/grpo_qlora_qwen.yaml
-	@if [ -z "$(NAME)" ] || [ -z "$(CONFIG)" ]; then \
-		echo "Usage: make setup NAME=<experiment-name> CONFIG=<path-to-yaml>"; \
-		exit 1; \
-	fi
-	python -m envelope.cli setup --name $(NAME) --config $(CONFIG) $(if $(OUTPUT),--output $(OUTPUT),)
+master-up:
+	@echo "🚀 Starting Master infrastructure..."
+	docker-compose -f docker-compose.yml up -d
+	@echo "✅ Services started"
+	@echo ""
+	@echo "Access points:"
+	@echo "  Neo4j Browser: http://localhost:7474 (neo4j/password)"
+	@echo "  Phoenix UI:    http://localhost:6006"
+	@echo "  Master API:    http://localhost:8000"
+	@echo ""
 
-validate: ## Validate a YAML config. Usage: make validate CONFIG=configs/examples/grpo_qlora_qwen.yaml
-	@if [ -z "$(CONFIG)" ]; then \
-		echo "Usage: make validate CONFIG=<path-to-yaml>"; \
-		exit 1; \
-	fi
-	python -m envelope.cli validate --config $(CONFIG)
+master-down:
+	@echo "⏹️  Stopping Master infrastructure..."
+	docker-compose -f docker-compose.yml down
+	@echo "✅ Services stopped"
 
-techniques: ## List all registered training techniques
-	python -m envelope.cli techniques
+master-reset:
+	@echo "🔄 Resetting Master infrastructure (removing volumes)..."
+	docker-compose -f docker-compose.yml down -v
+	@echo "✅ Services stopped and volumes removed"
 
-frameworks: ## List all registered framework adapters
-	python -m envelope.cli frameworks
+master-logs:
+	docker-compose -f docker-compose.yml logs -f
 
-compatible: ## Show compatible frameworks for a technique. Usage: make compatible TECHNIQUE=grpo
-	@if [ -z "$(TECHNIQUE)" ]; then \
-		echo "Usage: make compatible TECHNIQUE=<technique-name>"; \
-		exit 1; \
-	fi
-	python -m envelope.cli compatible $(TECHNIQUE)
+master-logs-neo4j:
+	docker-compose -f docker-compose.yml logs -f neo4j
 
-# ─── Development ───
+master-logs-phoenix:
+	docker-compose -f docker-compose.yml logs -f phoenix
 
-install: ## Install the project and dependencies
-	pip install -e ".[dev]"
+master-logs-api:
+	docker-compose -f docker-compose.yml logs -f master-api
 
-test: ## Run test suite
-	pytest tests/ -v
+master-status:
+	@docker-compose -f docker-compose.yml ps
 
-lint: ## Run linter
-	ruff check envelope/ tests/
+neo4j-shell:
+	@echo "Opening Neo4j cypher-shell..."
+	docker exec -it lineage-neo4j cypher-shell -u neo4j -p password
 
-format: ## Format code
-	ruff format envelope/ tests/
+master-test:
+	@echo "🧪 Running Phase 2 lineage tests with Docker..."
+	source .venv/bin/activate && python -m pytest tests/lineage/ -v --tb=short
+	@echo "✅ Tests complete"
 
-help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+# Testing shortcuts
+test-constraints:
+	source .venv/bin/activate && python -m pytest tests/lineage/test_constraints.py -v
 
-.DEFAULT_GOAL := help
+test-triggers:
+	source .venv/bin/activate && python -m pytest tests/lineage/test_apoc_triggers.py -v
+
+test-driver:
+	source .venv/bin/activate && python -m pytest tests/lineage/test_neo4j_driver.py -v
+
+test-repository:
+	source .venv/bin/activate && python -m pytest tests/lineage/test_repository_impl.py tests/lineage/test_repository_advanced.py -v
+
+# Development helpers
+lint:
+	source .venv/bin/activate && ruff check . --fix
+
+format:
+	source .venv/bin/activate && ruff format .
+
+type-check:
+	source .venv/bin/activate && python -m mypy master/ --ignore-missing-imports
+
+dev-setup:
+	pip install -e ".[dev,test,master]"
+
+# CI targets
+ci-test: master-up test-constraints test-triggers test-driver test-repository
+	@echo "✅ All tests passed"
+
+ci-lint: lint format
+	@echo "✅ Linting passed"
