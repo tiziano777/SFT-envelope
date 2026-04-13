@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Shared Layer** - Pydantic dataclasses, enums, ConfigHasher, DiffEngine, and transport envelopes
 - [ ] **Phase 2: Database Layer** - Neo4j schema, APOC triggers, driver, and repository with atomic Cypher queries
-- [ ] **Phase 3: Observability** - Phoenix tracing setup, OTEL integration, and Docker service
+- [x] **Phase 3: Observability** - Phoenix tracing setup, OTEL integration, and Docker service
 - [ ] **Phase 4: Master API + Infrastructure** - FastAPI endpoints, LineageController, auth middleware, Docker Compose, Makefile
 - [ ] **Phase 5: Storage Layer** - BaseStorageWriter ABC, URIResolver, LocalStorage, and S3/NFS stubs
 - [ ] **Phase 6: Worker Layer** - Connections, local persistence, filesystem watcher, async pusher, and daemon
@@ -75,7 +75,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 03-01-PLAN.md — OTEL tracing setup, FastAPI auto-instrumentation, manual spans on 5 critical endpoints, graceful degradation, integration tests with Phoenix
+- [x] 03-01-PLAN.md — OTEL tracing setup, FastAPI auto-instrumentation, manual spans on 5 critical endpoints, graceful degradation, integration tests with Phoenix
 
 ### Phase 4: Master API + Infrastructure
 **Goal**: Master API accepts Worker requests over HTTP, applies lineage logic, and runs in Docker with all supporting services
@@ -195,7 +195,7 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 |-------|----------------|--------|-----------|
 | 1. Shared Layer | 2/2 | Complete | 2026-04-10 |
 | 2. Database Layer | 0/2 | Not started | - |
-| 3. Observability | 1/1 | Planned | - |
+| 3. Observability | 1/1 | Complete | 2026-04-13 |
 | 4. Master API + Infrastructure | 0/3 | Not started | - |
 | 5. Storage Layer | 0/1 | Not started | - |
 | 6. Worker Layer | 0/3 | Not started | - |
