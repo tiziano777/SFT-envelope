@@ -22,6 +22,7 @@ from envelope.middleware.shared.envelopes import (
     Strategy,
     SyncEvent,
 )
+from master.controllers import LineageController
 from master.observability.tracing import get_tracer, setup_tracing
 
 logger = logging.getLogger(__name__)
@@ -86,19 +87,13 @@ def create_app() -> FastAPI:
 
         # Span 2: determine_strategy
         with tracer.start_as_current_span("master.api.handshake.determine_strategy") as span:
-            if existing_exp:
-                strategy = Strategy.RESUME
-            elif req.base_exp_id:
-                if req.checkpoint_id_to_resume:
-                    strategy = Strategy.RETRY
-                else:
-                    strategy = Strategy.BRANCH
-            else:
-                strategy = Strategy.NEW
-
+            strategy = LineageController.determine_strategy(existing_exp, req)
             span.set_attribute("strategy", strategy.value)
 
-        exp_id = existing_exp.exp_id if existing_exp else str(uuid.uuid4())
+        # Span 3: exp_id generation
+        with tracer.start_as_current_span("master.api.handshake.exp_id_generation") as span:
+            exp_id = LineageController.exp_id_from_strategy(strategy, existing_exp, req)
+            span.set_attribute("exp_id", exp_id)
 
         return HandshakeResponse(
             exp_id=exp_id,
