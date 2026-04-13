@@ -71,6 +71,96 @@ Ogni framework supporta diversi livelli di integrazione con i tre pilastri di ot
 
 > Per la documentazione completa su FSDP vedi [`docs/fsdp.md`](docs/fsdp.md).
 
+## Lineage System
+
+FineTuning-Envelope includes an automatic lineage tracking system that captures the complete history of every experiment: from initial configuration, through training checkpoints, to branching and merging operations. This enables reproducibility, experiment comparison, and relationship discovery without manual tracking.
+
+### Overview
+
+**What**: The lineage system automatically tracks experiment configurations, code changes, checkpoints, and relationships (branches, retries, merges).
+
+**Why**: In large-scale fine-tuning workflows, experiments quickly become interconnected. Without structured tracking, you lose the ability to reproduce earlier results or understand why one configuration outperformed another.
+
+**How**: A Worker daemon (on the GPU node) watches for checkpoint writes and configuration changes, then asynchronously syncs them to a Master API. The Master stores the lineage graph in Neo4j, enabling powerful queries across experiment history.
+
+### Architecture Overview
+
+```
+Worker (GPU)                          Master (CPU)
+┌──────────────────┐                ┌──────────────────┐
+│ daemon.py        │ handshake       │ API /            │
+│ ↓                │─────────────→  │  handshake       │
+│ pusher.py        │                │                  │
+│ (async)          │ checkpoint      │ LineageCtrl      │
+│ ↓                │ push ──────────→│ ↓                │
+│ train.py         │                │ Neo4j graph      │
+│                  │ metrics        │ • Nodes          │
+│ metrics ────────→│ transfer       │ • Relations      │
+│                  │                │                  │
+└──────────────────┘                └──────────────────┘
+```
+
+### Key Concepts
+
+- **Strategy**: How a new experiment relates to existing ones
+  - **NEW**: Fresh experiment from scratch
+  - **RESUME**: Same config, same code — continue from last checkpoint
+  - **BRANCH**: Config changed (e.g., different learning rate) — new direction
+  - **RETRY**: Same config, different seed — statistical validation
+
+- **Trigger Hash**: SHA256(config.yaml + train.py + rewards/*)
+  - Excludes requirements.txt (implementation detail, not semantics)
+  - Changes to any of these trigger strategy detection
+
+- **Checkpoint Tracking**: Stores epoch, run number, metrics (JSON), artifact URI, timestamp
+
+- **Async Sync**: Training proceeds unblocked. Daemon syncs in background with exponential backoff retry. No network timeout blocks train.py.
+
+### Enable Lineage
+
+Lineage is **enabled by default** on all experiments. Each setup generated includes the worker daemon and shared utilities automatically (see `workflow.md` "FASE 16 — Worker Middleware Injection").
+
+To use lineage tracking, start the Master API server:
+
+```bash
+# Start Master API (Neo4j + FastAPI + observability stack)
+make master-up
+
+# Verify it's running
+curl http://localhost:8000/health
+```
+
+Configure the Worker connection via environment variables:
+
+```bash
+export MASTER_API_URL=http://localhost:8000
+export X_API_KEY=your-secret-key
+
+# Generate setup
+envelope setup --name my-exp --config my-config.yaml
+
+# Run training
+cd setups/setup_my-exp
+bash run.sh
+```
+
+During training, the daemon will:
+1. Send handshake to Master → get experiment_id
+2. Watch for checkpoint writes and config changes
+3. Send updates asynchronously to Master
+4. Create audit trail in transfer_log.jsonl
+
+If Master is unavailable, training continues in degraded mode. Checkpoints are queued locally and synced when Master comes back online.
+
+### Learn More
+
+- **Architecture & Design**: [`docs/lineage/architecture.md`](docs/lineage/architecture.md) — System design, failure modes, security model
+- **Neo4j Schema**: [`docs/lineage/schema.md`](docs/lineage/schema.md) — Node types, relations, constraints, example queries
+- **API Reference**: [`docs/lineage/api-reference.md`](docs/lineage/api-reference.md) — All 5 endpoints with request/response examples
+- **Troubleshooting**: [`docs/lineage/troubleshooting.md`](docs/lineage/troubleshooting.md) — Common issues and debug steps
+
+---
+
 ## Quick Start
 
 ### Installazione

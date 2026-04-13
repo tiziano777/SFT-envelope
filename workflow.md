@@ -248,6 +248,239 @@ setups/setup_grpo-math-v1/
 
 ---
 
+## FASE 16 — Iniezione Worker Middleware (step 16 nella generazione setup)
+
+Durante la generazione del setup (FASE 4), dopo il rendering dei template, viene eseguito il **passo 16: inject_worker_middleware()** che copia i moduli worker daemon e le utility condivise dal progetto envelope nel setup generato.
+
+### Cosa fa
+
+La funzione `inject_worker_middleware()` copia il contenuto della directory `envelope/middleware/` in tre sotto-componenti all'interno del setup generato:
+
+1. **worker/daemon.py** — Worker daemon per handshake e push asincrone
+2. **shared/models.py** — Modelli per WorkerState, TransferLogEntry, ConnectionModels
+3. **shared/state.py** — Gestione atomica dello stato locale
+
+Inoltre, aggiorna automaticamente `requirements.txt` con tre dipendenze critiche:
+- **watchdog** — Per osservare i file system (lineage/to_transfer/, training_metrics/)
+- **httpx** — Client HTTP asincrono per comunicazione Master
+- **paramiko** — SSH per connessioni remote (per future estensioni)
+
+### Perche'
+
+Ogni setup generato deve essere autocontenuto: contiene tutto il necessario per lanciare un training senza dipendere da installazioni globali. Il worker daemon e le utility condivise sono fondamentali per il tracciamento della lineage (Phase 6-7), quindi vengono iniettate automaticamente nel setup.
+
+### Struttura generata
+
+```
+envelope/middleware/
+├── shared/
+│   ├── models.py      (WorkerState, TransferLogEntry, ConnectionModels)
+│   └── __init__.py
+└── worker/
+    ├── daemon.py      (WorkerDaemon class)
+    ├── connection.py  (BaseConnection, HTTPConnection, SSHConnection)
+    ├── pusher.py      (AsyncPusher, queue + retry)
+    └── __init__.py
+
+↓ inject_worker_middleware() ↓
+
+setup_myexp/
+├── worker/
+│   ├── daemon.py      (copia di envelope/middleware/worker/daemon.py)
+│   ├── connection.py  (copia di envelope/middleware/worker/connection.py)
+│   ├── pusher.py      (copia di envelope/middleware/worker/pusher.py)
+│   └── __init__.py
+├── shared/
+│   ├── models.py      (copia di envelope/middleware/shared/models.py)
+│   ├── state.py
+│   └── __init__.py
+├── prepare.py
+├── train.py
+├── run.sh
+├── requirements.txt   (+ watchdog, httpx, paramiko aggiunti)
+└── config.yaml
+```
+
+### Idempotenza
+
+Il passo 16 è idempotente: utilizza `os.path.exists()` per verificare prima di copiare. Se il setup è già stato generato e le directory worker/ e shared/ esistono, il passo salta la copia. Questo rende sicuro rigenerare lo stesso setup senza corrompere i file.
+
+### Link con run.sh
+
+Il file `run.sh` generato (da template `run.sh.j2`) usa questi moduli iniettati:
+- Avvia il worker daemon in background: `python -m worker.daemon`
+- Attende la comunicazione col Master via handshake
+- Durante il training, il daemon osserva i checkpoint scritti e li invia al Master
+
+Vedi **Worker Daemon Lifecycle** (sezione seguente) per dettagli sul flusso di esecuzione.
+
+### Worker Daemon Lifecycle in Generated run.sh
+
+Il file `run.sh` generato (da template `run.sh.j2`) orchestrates the complete lifecycle of the worker daemon and training process. Ecco le 5 fasi in sequenza:
+
+**1. Daemon Bootstrap (linee 1-15)**
+
+```bash
+# Source shared environment
+source .env 2>/dev/null || true
+
+# Check if daemon already running (prevent double-start)
+if [ -f ".daemon.pid" ] && kill -0 $(cat .daemon.pid) 2>/dev/null; then
+    echo "✓ Daemon already running (PID: $(cat .daemon.pid))"
+else
+    # Start worker daemon in background
+    python -m worker.daemon &
+    DAEMON_PID=$!
+    echo $DAEMON_PID > .daemon.pid
+    echo "✓ Started daemon (PID: $DAEMON_PID)"
+fi
+```
+
+**2. Handshake Wait (linee 16-25)**
+
+Dopo l'avvio del daemon, il run.sh attende il completamento della comunicazione col Master. Questo avviene via loop sul marker file `.handshake_done`:
+
+```bash
+# Loop con 30-second timeout (configurable via HANDSHAKE_TIMEOUT)
+HANDSHAKE_TIMEOUT=${HANDSHAKE_TIMEOUT:-30}
+ELAPSED=0
+
+while [ $ELAPSED -lt $HANDSHAKE_TIMEOUT ]; do
+    if [ -f ".handshake_done" ]; then
+        EXP_ID=$(cat .exp_id)
+        echo "✓ Handshake complete. Experiment: $EXP_ID"
+        break
+    fi
+    sleep 1
+    ELAPSED=$((ELAPSED + 1))
+done
+
+if [ ! -f ".handshake_done" ]; then
+    echo "⚠ Handshake timeout. Running in degraded mode (no lineage sync)"
+fi
+```
+
+**Cosa accade durante handshake:**
+- Il daemon contatta il Master API all'indirizzo `$MASTER_API_URL` (default: http://localhost:8000)
+- Invia un POST /handshake con config_hash, code_hash, req_hash
+- Master risponde con una strategia (NEW, RESUME, BRANCH, RETRY) e un experiment_id unico
+- Il daemon salva experiment_id in `.exp_id` e crea il marker `.handshake_done`
+- Se il Master è irraggiungibile o timeout scade, il training continua in "degraded mode" (nessuna lineage)
+
+**3. Training Loop (linee 26-40)**
+
+Una volta che il handshake è completato (o timeout), il training.py viene eseguito con la configurazione completa:
+
+```bash
+# Run user's train.py with all config
+python train.py \
+    --config config.yaml \
+    --output_dir ./outputs \
+    --num_train_epochs 3 \
+    --learning_rate 2e-4
+```
+
+**Durante il training:**
+- Il daemon continua a girare in background
+- Watchdog monitora le directory critiche:
+  - `lineage/to_transfer/` — Checkpoint in attesa di essere inviati
+  - `training_metrics/` — Metriche di allenamento
+  - `config/rewards/` — Cambiamenti nella configurazione reward
+- Il daemon legge i checkpoint e costruisce eventi CheckpointPush
+- AsyncPusher invia gli eventi al Master **asincronamente** con retry esponenziale (2s, 4s, 8s, ..., max 5 min)
+- Il training.py non è bloccato; procede indipendentemente dal successo del daemon
+
+**4. Training Complete (linee 41-45)**
+
+Quando train.py completa (successo o errore), run.sh segnala al daemon di entrare in "flush mode":
+
+```bash
+# train.py exit status (0=success, 1=failure)
+TRAIN_EXIT=$?
+
+# Create .training_done marker file
+touch .training_done
+
+if [ $TRAIN_EXIT -eq 0 ]; then
+    echo "✓ Training completed successfully"
+else
+    echo "✗ Training failed with exit code $TRAIN_EXIT"
+fi
+```
+
+**5. Daemon Flush & Cleanup (linee 46-50)**
+
+Il daemon entra in "one-shot mode": dopo aver inviato tutti gli eventi in coda e scritto il transfer_log finale, il daemon esce:
+
+```bash
+# Wait for daemon to flush (5 second timeout per flush)
+FLUSH_TIMEOUT=5
+FLUSH_START=$(date +%s)
+
+while kill -0 $(cat .daemon.pid) 2>/dev/null; do
+    FLUSH_ELAPSED=$(($(date +%s) - FLUSH_START))
+    if [ $FLUSH_ELAPSED -gt $FLUSH_TIMEOUT ]; then
+        echo "⚠ Daemon flush timeout. Killing daemon."
+        kill -9 $(cat .daemon.pid) 2>/dev/null || true
+        break
+    fi
+    sleep 0.5
+done
+
+# Cleanup (optional; keep for debugging)
+rm -f .daemon.pid .handshake_done
+```
+
+### Timeline Diagram
+
+```
+time →
+┌──────────────────────────────────────────────────────────────────┐
+│  Phase 1              Phase 2           Phase 3      Phase 4 & 5  │
+│  Daemon Bootstrap     Handshake Wait   Training     Flush & Exit  │
+│                                                                     │
+│ ┌───────────────┐    ┌──────────────┐  ┌─────────┐ ┌────────────┐│
+│ │daemon start   │    │check         │  │train.py │ │flush logs  ││
+│ │in background  │    │.handshake_   │  │runs     │ │daemon exit ││
+│ │save PID       │    │_done marker  │  │         │ │            ││
+│ │(max 30s)      │───→│              │→ │daemon   │ │transfer_   ││
+│ │               │    │timeout?      │  │watches  │ │log.jsonl ✓ ││
+│ │               │    │degraded      │  │async    │ │            ││
+│ │               │    │mode if no    │  │push     │ │            ││
+│ │               │    │.handshake    │  │backoff  │ │            ││
+│ └───────────────┘    │.exp_id ✓     │  │         │ │            ││
+│        ↓             └──────────────┘  │         │ └────────────┘│
+│  ~1-2 seconds        ~0-30 seconds     │  hours  │    ~5 seconds ││
+└──────────────────────────────────────────────────────────────────┘
+                                           ↓
+                        Worker (GPU) ← HTTP/async → Master (CPU)
+                          lineage sync in background
+```
+
+### State Files Created
+
+Durante l'esecuzione vengono creati questi file di stato:
+
+| File | Quando | Contenuto | Esempio |
+|------|--------|-----------|---------|
+| `.daemon.pid` | Daemon bootstrap | Process ID del daemon | `12345` |
+| `.exp_id` | Handshake OK | ID esperimento univoco | `e-20260413-001` |
+| `.handshake_done` | Handshake OK | Marker file (vuoto) | (exists) |
+| `.training_done` | Training completo | Marker file (vuoto) | (exists) |
+| `.worker_state.json` | Runtime | Stato atomico del daemon | `{status: "training", ...}` |
+| `transfer_log.jsonl` | Runtime | Audit trail di tutti gli eventi | Una riga per evento |
+
+### Degraded Mode (Master Unavailable)
+
+Se il Master è irraggiungibile durante la handshake (timeout di 30s), il setup continua in "degraded mode":
+- Training procede normalmente
+- Nessun experiment_id assegnato
+- Il daemon continua a girare, tentando di riconnessione con backoff esponenziale
+- Al successivo lancio, se il Master è back online, il daemon prova di nuovo il handshake
+- I checkpoint rimangono in `lineage/to_transfer/` fino a quando il handshake ha successo
+
+---
+
 ## FASE 5 — Training singolo (test manuale)
 
 ```bash
@@ -300,6 +533,78 @@ Al momento della generazione del setup, questi overrides vengono embeddati in `t
 2. `hparam_overrides` nel config YAML
 3. Framework defaults (TRL, Unsloth, etc.)
 4. Envelope defaults globali
+
+---
+
+## Architettura: Worker-Master Async Pattern
+
+Il pattern Worker-Master define l'architettura complessiva del sistema di lineage tracking. Worker (GPU node) e Master (CPU node) comunicano asincronamente via HTTP per sincronizzare checkpoint, metriche, e cambiamenti di configurazione.
+
+### Spatial and Temporal Separation
+
+```
+┌─── GPU NODE (setup_{name}/) ────────────────────────────────────┐
+│                                                                    │
+│  run.sh (generated from run.sh.j2 template)                      │
+│  ├─ Start daemon: python -m worker.daemon                        │
+│  ├─ Wait: .handshake_done ← Master /handshake POST              │
+│  └─ Run: train.py (independent of daemon health)                 │
+│                                                                    │
+│  worker/daemon.py (Phase 6)                                      │
+│  ├─ [1] Handshake: POST /handshake → exp_id                      │
+│  ├─ [2] Watch: lineage/to_transfer/, training_metrics/          │
+│  ├─ [3] Queue: CheckpointPush, SyncEvent events                 │
+│  └─ [4] Async Push: exponential backoff retry                    │
+│                                                                    │
+│  Local persistence                                                │
+│  ├─ .worker_state.json (atomic state via tmp+rename)            │
+│  ├─ transfer_log.jsonl (append-only audit trail)                │
+│  └─ .handshake_done, .exp_id (markers)                           │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+                             │
+                             │ HTTP/JSON
+                             ↓
+┌─── MASTER NODE ─────────────────────────────────────────────────┐
+│                                                                   │
+│  Master API (FastAPI, Phase 4)                                  │
+│  ├─ POST /handshake → strategy (NEW/RESUME/BRANCH/RETRY)        │
+│  ├─ POST /checkpoint_push → validate & store                    │
+│  ├─ POST /status_update → track lifecycle                       │
+│  ├─ POST /merge → combine checkpoints                           │
+│  └─ POST /sync_event → async event processing                   │
+│                                                                   │
+│  Master lineage store (Phase 2)                                  │
+│  ├─ Neo4j 5.x with 5 UNIQUE constraints                         │
+│  ├─ Node types: :Experiment, :Checkpoint, :Recipe, :Model      │
+│  ├─ Relations: DERIVED_FROM, RETRY_FROM, MERGED_FROM            │
+│  └─ APOC triggers: auto-timestamps, orphan validation            │
+│                                                                   │
+│  Observability (Phase 3)                                         │
+│  ├─ OpenTelemetry SDK                                            │
+│  ├─ FastAPI auto-instrumentation                                │
+│  └─ Phoenix UI for trace visualization                          │
+│                                                                   │
+└────────────────────────────────────────────────────────────────────┘
+
+Data Flow:
+├─ Worker: train.py writes checkpoint → daemon observes → queues event
+├─ Worker: daemon sends HTTP POST /checkpoint_push
+├─ Master: FastAPI receives → LineageController validates
+├─ Master: creates Neo4j Checkpoint node + relations
+├─ Master: returns 200 + checkpoint_id
+└─ Worker: daemon logs event to transfer_log.jsonl (audit trail)
+```
+
+### Key Design Properties
+
+**Decoupled**: Training proceeds unblocked even if daemon or Master unavailable. No blocking calls during train.py.
+
+**Async**: Checkpoint sync happens in background with exponential backoff retry. Worker doesn't wait for network round-trips.
+
+**Atomic**: Local state persisted via tmp+rename pattern (atomic on POSIX). transfer_log.jsonl is append-only for forensics.
+
+**Traceable**: Every event has event_id, timestamp, source for debugging and replay. Neo4j audit trail immutable.
 
 ---
 
