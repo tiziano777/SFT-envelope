@@ -77,15 +77,35 @@ class AsyncNeo4jClient:
 
         Args:
             node_id: Node ID to check.
-            label: Node label (e.g., 'Model', 'Component').
+            label: Node label (e.g., 'Model', 'Component', 'Recipe').
 
         Returns:
             Count of incoming relationships.
+
+        Raises:
+            ValueError: If label is not in the allowed set.
         """
-        query = f"""
-        MATCH (n:{label} {{id: $id}})<-[r]-(m)
-        RETURN count(r) as dep_count
-        """
+        ALLOWED_LABELS = {"Model", "Component", "Recipe"}
+        if label not in ALLOWED_LABELS:
+            raise ValueError(f"Invalid label: {label}. Allowed: {ALLOWED_LABELS}")
+
+        # Use separate queries for each allowed label to prevent Cypher injection
+        if label == "Model":
+            query = """
+            MATCH (n:Model {id: $id})<-[r]-(m)
+            RETURN count(r) as dep_count
+            """
+        elif label == "Component":
+            query = """
+            MATCH (n:Component {id: $id})<-[r]-(m)
+            RETURN count(r) as dep_count
+            """
+        else:  # label == "Recipe"
+            query = """
+            MATCH (n:Recipe {id: $id})<-[r]-(m)
+            RETURN count(r) as dep_count
+            """
+
         result = await self.run_single(query, id=node_id)
         return result["dep_count"] if result else 0
 

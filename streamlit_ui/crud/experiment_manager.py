@@ -149,33 +149,159 @@ class ExperimentManager:
             Updated experiment data.
         """
         now = datetime.utcnow().isoformat()
-
-        set_clauses = ["e.updated_at = $updated_at"]
         params = {"id": exp_id, "updated_at": now}
 
-        if status is not None:
-            set_clauses.append("e.status = $status")
+        # Build parameterized query based on which fields are provided
+        # Use fixed query patterns instead of dynamic f-string construction
+        if status is not None and description is not None and exit_status is not None and exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.description = $description,
+                e.exit_status = $exit_status, e.exit_msg = $exit_msg,
+                e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"status": status, "description": description, "exit_status": exit_status, "exit_msg": exit_msg})
+        elif status is not None and description is not None and exit_status is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.description = $description,
+                e.exit_status = $exit_status, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"status": status, "description": description, "exit_status": exit_status})
+        elif status is not None and description is not None and exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.description = $description,
+                e.exit_msg = $exit_msg, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"status": status, "description": description, "exit_msg": exit_msg})
+        elif status is not None and exit_status is not None and exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.exit_status = $exit_status,
+                e.exit_msg = $exit_msg, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"status": status, "exit_status": exit_status, "exit_msg": exit_msg})
+        elif description is not None and exit_status is not None and exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.description = $description, e.exit_status = $exit_status,
+                e.exit_msg = $exit_msg, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"description": description, "exit_status": exit_status, "exit_msg": exit_msg})
+        elif status is not None and description is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.description = $description, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"status": status, "description": description})
+        elif status is not None and exit_status is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.exit_status = $exit_status, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"status": status, "exit_status": exit_status})
+        elif status is not None and exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.exit_msg = $exit_msg, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"status": status, "exit_msg": exit_msg})
+        elif description is not None and exit_status is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.description = $description, e.exit_status = $exit_status, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"description": description, "exit_status": exit_status})
+        elif description is not None and exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.description = $description, e.exit_msg = $exit_msg, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"description": description, "exit_msg": exit_msg})
+        elif exit_status is not None and exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.exit_status = $exit_status, e.exit_msg = $exit_msg, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
+            params.update({"exit_status": exit_status, "exit_msg": exit_msg})
+        elif status is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.status = $status, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
             params["status"] = status
-
-        if description is not None:
-            set_clauses.append("e.description = $description")
+        elif description is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.description = $description, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
             params["description"] = description
-
-        if exit_status is not None:
-            set_clauses.append("e.exit_status = $exit_status")
+        elif exit_status is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.exit_status = $exit_status, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
             params["exit_status"] = exit_status
-
-        if exit_msg is not None:
-            set_clauses.append("e.exit_msg = $exit_msg")
+        elif exit_msg is not None:
+            query = """
+            MATCH (e:Experiment {id: $id})
+            SET e.exit_msg = $exit_msg, e.updated_at = $updated_at
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
             params["exit_msg"] = exit_msg
-
-        query = f"""
-        MATCH (e:Experiment {{id: $id}})
-        SET {', '.join(set_clauses)}
-        RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
-               e.status as status, e.description as description,
-               e.updated_at as updated_at
-        """
+        else:
+            # No fields to update, just return current experiment
+            query = """
+            MATCH (e:Experiment {id: $id})
+            RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
+                   e.status as status, e.description as description,
+                   e.updated_at as updated_at
+            """
 
         result = await self.db.run_single(query, **params)
 
