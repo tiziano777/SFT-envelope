@@ -67,6 +67,34 @@ def load_config(path: str | Path) -> EnvelopeConfig:
     return config
 
 
+def load_yaml_config(yaml_str: str) -> EnvelopeConfig:
+    """Load and validate EnvelopeConfig from YAML string.
+
+    Args:
+        yaml_str: YAML content as string.
+
+    Returns:
+        Validated EnvelopeConfig instance.
+
+    Raises:
+        ValueError: If YAML is invalid or empty.
+        ValidationError: If config doesn't match schema.
+    """
+    data = yaml.safe_load(yaml_str)
+    if data is None:
+        raise ValueError("Empty YAML content")
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected YAML dict, got {type(data).__name__}")
+
+    # Merge defaults and validate
+    data = merge_technique_defaults(data)
+    if "hparam_overrides" not in data:
+        data["hparam_overrides"] = dict(HYPERPARAMETER_DEFAULTS)
+
+    config = EnvelopeConfig.model_validate(data)
+    return config
+
+
 def dump_config(config: EnvelopeConfig, path: str | Path) -> None:
     """Serialize an EnvelopeConfig back to YAML."""
     data = config.model_dump(mode="json", exclude_none=True)
