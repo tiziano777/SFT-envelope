@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 from envelope.config.defaults import HYPERPARAMETER_DEFAULTS
-from envelope.config.models import EnvelopeConfig
+from envelope.config.models import EnvelopeConfig, RecipeConfig, RecipeEntry
 from envelope.registry import discover_plugins, technique_registry
 
 
@@ -92,6 +92,34 @@ def load_yaml_config(yaml_str: str) -> EnvelopeConfig:
         data["hparam_overrides"] = dict(HYPERPARAMETER_DEFAULTS)
 
     config = EnvelopeConfig.model_validate(data)
+    return config
+
+
+def load_recipe_yaml(yaml_str: str) -> RecipeConfig:
+    """Load and validate RecipeConfig (distribution/dataset metadata) from YAML string.
+
+    Args:
+        yaml_str: YAML content as string.
+
+    Returns:
+        Validated RecipeConfig instance.
+
+    Raises:
+        ValueError: If YAML is invalid or empty.
+        ValidationError: If format doesn't match schema.
+    """
+    data = yaml.safe_load(yaml_str)
+    if data is None:
+        raise ValueError("Empty YAML content")
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected YAML dict, got {type(data).__name__}")
+
+    # Wrap top-level entries in 'entries' key if not already present
+    if "entries" not in data:
+        # Assume all top-level keys are dataset paths
+        data = {"entries": data}
+
+    config = RecipeConfig.model_validate(data)
     return config
 
 

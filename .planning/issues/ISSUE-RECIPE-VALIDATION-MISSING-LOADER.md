@@ -1,6 +1,6 @@
 # Issue: Recipe Validation Fails — Missing load_yaml_config() Function
 
-**Status:** NEW
+**Status:** RESOLVED
 **Severity:** HIGH
 **Component:** streamlit_ui / envelope.config
 **Date Reported:** 2026-04-14
@@ -147,3 +147,28 @@ Name: my-training-setup
 ## Workaround
 
 None available. Issue blocks all recipe uploads via UI.
+
+## Resolution
+
+**Commit:** 691b952
+
+### Changes Made
+
+1. **`envelope/config/loader.py`**: Added `load_yaml_config(yaml_str: str) → EnvelopeConfig`
+   - Parses YAML string (not file path)
+   - Validates against EnvelopeConfig schema
+   - Merges technique defaults
+   - Injects hparam overrides
+   - Raises meaningful errors for format/validation failures
+
+2. **`streamlit_ui/validation.py`**: Enhanced error handling
+   - Separate exception handling for ValueError (YAML format), ValidationError (schema)
+   - Helpful import failure messages with installation guidance
+   - Better user-facing error messages
+
+### Result
+
+✓ Recipe uploads now work
+✓ Invalid YAML returns clear validation errors listing missing/invalid fields
+✓ Distribution metadata rejected with schema mismatch errors
+✓ Code paths verified via `git diff`

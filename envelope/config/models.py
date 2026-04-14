@@ -441,3 +441,36 @@ class EnvelopeConfig(BaseModel):
                 self.optimization.fsdp.mixed_precision = FSDPMixedPrecision.FP16
 
         return self
+
+
+# ─── Recipe/Distribution Metadata ───
+
+
+class RecipeEntry(BaseModel):
+    """Metadata for a single distribution/dataset entry in a recipe."""
+
+    chat_type: str = Field(..., min_length=1, description="Chat conversation type")
+    dist_id: str = Field(..., min_length=1, description="Distribution unique identifier")
+    dist_name: str = Field(..., min_length=1, description="Human-readable distribution name")
+    dist_uri: str = Field(..., min_length=1, description="Path or URI to distribution")
+    replica: int = Field(1, ge=1, description="Replication factor (N× oversampling)")
+    samples: int = Field(..., gt=0, description="Total number of samples in distribution")
+    schema_template: dict[str, Any] | None = Field(None, description="JSON Schema defining record structure")
+    system_prompt: list[str] | None = Field(None, description="System prompt templates")
+    system_prompt_name: list[str] | None = Field(None, description="System prompt names")
+    tokens: int = Field(..., gt=0, description="Total token count")
+    words: int = Field(..., gt=0, description="Total word count")
+    validation_error: str | None = Field(None, description="Validation error if any")
+
+
+class RecipeConfig(BaseModel):
+    """Configuration for recipe/distribution metadata (separate from training setup).
+
+    Maps dataset paths to their metadata entries.
+    """
+
+    entries: dict[str, RecipeEntry] = Field(
+        ...,
+        min_length=1,
+        description="Mapping of dataset paths to distribution metadata"
+    )
