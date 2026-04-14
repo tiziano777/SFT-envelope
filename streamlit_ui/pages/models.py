@@ -14,13 +14,70 @@ from streamlit_ui.utils.caching import get_api_client, get_neo4j_client
 logger = logging.getLogger(__name__)
 
 
+# Async helper functions for model operations
+async def create_model_async(
+    model_name: str, version: str, url: str, doc_url: str, description: str
+) -> dict:
+    """Create model asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = ModelManager(db_client, api_client)
+    return await manager.create_model(
+        model_name=model_name,
+        version=version,
+        url=url,
+        doc_url=doc_url,
+        description=description,
+    )
+
+
+async def list_models_async() -> list[dict]:
+    """List models asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = ModelManager(db_client, api_client)
+    return await manager.list_models()
+
+
+async def get_model_async(model_id: str) -> dict:
+    """Get model asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = ModelManager(db_client, api_client)
+    return await manager.get_model(model_id)
+
+
+async def update_model_async(
+    model_id: str, version: str, url: str, doc_url: str, description: str
+) -> None:
+    """Update model asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = ModelManager(db_client, api_client)
+    await manager.update_model(
+        model_id, version=version, url=url, doc_url=doc_url, description=description
+    )
+
+
+async def check_model_deps_async(model_id: str) -> int:
+    """Check model dependencies asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = ModelManager(db_client, api_client)
+    return await manager.check_model_dependencies(model_id)
+
+
+async def delete_model_async(model_id: str) -> None:
+    """Delete model asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = ModelManager(db_client, api_client)
+    await manager.delete_model(model_id)
+
+
 def run() -> None:
     """Run model management page."""
     st.title("Model Management")
-
-    db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ModelManager(db_client, api_client)
 
     tab_create, tab_browse, tab_edit, tab_delete = st.tabs(["Create", "Browse", "Edit", "Delete"])
 
@@ -40,7 +97,7 @@ def run() -> None:
                 else:
                     try:
                         result = asyncio.run(
-                            manager.create_model(
+                            create_model_async(
                                 model_name=model_name,
                                 version=version,
                                 url=url,
@@ -62,7 +119,7 @@ def run() -> None:
     with tab_browse:
         st.subheader("Browse Models")
         try:
-            models = asyncio.run(manager.list_models())
+            models = asyncio.run(list_models_async())
 
             if models:
                 for model in models:
@@ -81,14 +138,14 @@ def run() -> None:
     with tab_edit:
         st.subheader("Update Model")
         try:
-            models = asyncio.run(manager.list_models())
+            models = asyncio.run(list_models_async())
             model_names = {m["model_name"]: m["id"] for m in models}
 
             selected_name = st.selectbox("Select Model", list(model_names.keys()))
 
             if selected_name:
                 model_id = model_names[selected_name]
-                model = asyncio.run(manager.get_model(model_id))
+                model = asyncio.run(get_model_async(model_id))
 
                 with st.form("edit_model_form"):
                     version = st.text_input("Version", value=model.get("version", ""))
@@ -100,7 +157,7 @@ def run() -> None:
                     if submitted:
                         try:
                             asyncio.run(
-                                manager.update_model(
+                                update_model_async(
                                     model_id,
                                     version=version,
                                     url=url,
@@ -117,7 +174,7 @@ def run() -> None:
     with tab_delete:
         st.subheader("Delete Model")
         try:
-            models = asyncio.run(manager.list_models())
+            models = asyncio.run(list_models_async())
             model_names = {m["model_name"]: m["id"] for m in models}
 
             selected_name = st.selectbox("Select Model to Delete", list(model_names.keys()), key="delete")
@@ -126,7 +183,7 @@ def run() -> None:
                 model_id = model_names[selected_name]
 
                 try:
-                    dep_count = asyncio.run(manager.check_model_dependencies(model_id))
+                    dep_count = asyncio.run(check_model_deps_async(model_id))
 
                     if dep_count > 0:
                         st.warning(f"⚠️ This model is used by {dep_count} recipe(s)/experiment(s). Cannot delete.")
@@ -135,7 +192,7 @@ def run() -> None:
                         confirm = st.checkbox(f"I confirm deletion of '{selected_name}'")
                         if confirm and st.button("Delete Model"):
                             try:
-                                asyncio.run(manager.delete_model(model_id))
+                                asyncio.run(delete_model_async(model_id))
                                 st.success("✓ Model deleted!")
                             except UIError as e:
                                 st.error(f"Error: {e.user_message}")
