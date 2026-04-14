@@ -12,13 +12,34 @@ from streamlit_ui.utils.caching import get_api_client, get_neo4j_client
 from streamlit_ui.validation import validate_recipe_yaml
 
 
+# Async helper functions for recipe operations
+async def create_recipe_async(name: str, yaml_content: str) -> dict:
+    """Create recipe asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = RecipeManager(db_client, api_client)
+    return await manager.create_recipe(name=name, yaml_content=yaml_content)
+
+
+async def search_recipes_async(query: str) -> list[dict]:
+    """Search recipes asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = RecipeManager(db_client, api_client)
+    return await manager.search_recipes(query)
+
+
+async def list_recipes_async(limit: int = 20) -> list[dict]:
+    """List recipes asynchronously."""
+    db_client = await get_neo4j_client()
+    api_client = await get_api_client()
+    manager = RecipeManager(db_client, api_client)
+    return await manager.list_recipes(limit=limit)
+
+
 def run() -> None:
     """Run recipe management page."""
     st.title("Recipe Management")
-
-    db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = RecipeManager(db_client, api_client)
 
     tab1, tab2 = st.tabs(["Upload", "Browse"])
 
@@ -43,7 +64,7 @@ def run() -> None:
                         st.session_state.saving_recipe = True
                         try:
                             result = asyncio.run(
-                                manager.create_recipe(
+                                create_recipe_async(
                                     name=getattr(config, "name", uploaded_file.name),
                                     yaml_content=yaml_content,
                                 )
@@ -67,10 +88,10 @@ def run() -> None:
 
         try:
             if search_query.strip():
-                recipes = asyncio.run(manager.search_recipes(search_query))
+                recipes = asyncio.run(search_recipes_async(search_query))
                 st.caption(f"Found {len(recipes)} recipe(s)")
             else:
-                recipes = asyncio.run(manager.list_recipes(limit=20))
+                recipes = asyncio.run(list_recipes_async(limit=20))
 
             if recipes:
                 cols = st.columns(3)
@@ -87,3 +108,4 @@ def run() -> None:
         except UIError as e:
             st.error(f"Error: {e.user_message}")
             st.caption(e.details)
+
