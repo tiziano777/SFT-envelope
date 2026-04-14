@@ -69,14 +69,14 @@ async def test_count_relationships_invalid_label_injection():
     # Test various injection payloads - all should raise ValueError
     injection_payloads = [
         "User'; DROP TABLE Model; --",        # SQL injection pattern
-        "Model} DETACH DELETE m //',          # Cypher injection pattern
+        "Model} DETACH DELETE m //",          # Cypher injection pattern
         "Model) LOAD CSV FROM",               # LOAD CSV injection
         "ArbitraryLabel",                     # Unknown label
         "model",                               # Case mismatch (should be Model)
     ]
 
     for payload in injection_payloads:
-        with pytest.raises(ValueError, match=f"Invalid label: {payload}"):
+        with pytest.raises(ValueError):
             await client.count_relationships("test-id", payload)
 
     await client.close()

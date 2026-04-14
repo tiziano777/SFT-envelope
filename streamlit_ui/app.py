@@ -39,9 +39,6 @@ def main() -> None:
         "Navigate",
         [
             "Recipes",
-            "Models",
-            "Components",
-            "Experiments",
             "Health Check",
         ],
     )
@@ -51,18 +48,6 @@ def main() -> None:
         from pages import recipes
 
         recipes.run()
-    elif page == "Models":
-        from pages import models
-
-        models.run()
-    elif page == "Components":
-        from pages import components
-
-        components.run()
-    elif page == "Experiments":
-        from pages import experiments
-
-        experiments.run()
     elif page == "Health Check":
         from pages import health_check
 

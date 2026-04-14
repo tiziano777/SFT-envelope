@@ -469,9 +469,16 @@ class RecipeConfig(BaseModel):
     Maps dataset paths to their metadata entries.
     """
 
-    name: str | None = Field(None, min_length=1, description="Recipe name (typically from filename)")
+    name: str | None = Field(None, min_length=1, description="Recipe name (must be unique)")
     entries: dict[str, RecipeEntry] = Field(
         ...,
         min_length=1,
         description="Mapping of dataset paths to distribution metadata"
     )
+
+    @model_validator(mode="after")
+    def validate_name_not_empty_if_provided(self) -> RecipeConfig:
+        """Validate that name is not empty if provided."""
+        if self.name is not None and not self.name.strip():
+            raise ValueError("Recipe name cannot be empty or whitespace")
+        return self
