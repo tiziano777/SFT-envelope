@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import streamlit as st
 
 from streamlit_ui.crud.experiment_manager import ExperimentManager
 from streamlit_ui.errors import DeleteProtectionError, UIError
 from streamlit_ui.utils.caching import get_api_client, get_neo4j_client
+
+logger = logging.getLogger(__name__)
 
 
 def run() -> None:
@@ -45,6 +48,12 @@ def run() -> None:
                         st.toast("Experiment created!", icon="✓")
                     except UIError as e:
                         st.error(f"Error: {e.user_message}")
+                    except asyncio.TimeoutError:
+                        st.error("Request timed out. Please try again.")
+                        logger.exception("Timeout in create_experiment")
+                    except Exception as e:
+                        st.error(f"Unexpected error: {str(e)}")
+                        logger.exception("Uncaught exception in create_experiment")
 
     with tab_browse:
         st.subheader("Browse Experiments")
