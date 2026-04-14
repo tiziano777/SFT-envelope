@@ -8,31 +8,31 @@ import streamlit as st
 
 from streamlit_ui.crud import RecipeManager
 from streamlit_ui.errors import UIError
-from streamlit_ui.utils.caching import get_api_client, get_neo4j_client
+from streamlit_ui.utils import get_api_client, get_neo4j_client
 from streamlit_ui.validation import validate_recipe_yaml
 
 
 # Async helper functions for recipe operations
 async def create_recipe_async(name: str, yaml_content: str) -> dict:
     """Create recipe asynchronously."""
-    db_client = await get_neo4j_client()
-    api_client = await get_api_client()
+    db_client = get_neo4j_client()
+    api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
     return await manager.create_recipe(name=name, yaml_content=yaml_content)
 
 
 async def search_recipes_async(query: str) -> list[dict]:
     """Search recipes asynchronously."""
-    db_client = await get_neo4j_client()
-    api_client = await get_api_client()
+    db_client = get_neo4j_client()
+    api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
     return await manager.search_recipes(query)
 
 
 async def list_recipes_async(limit: int = 20) -> list[dict]:
     """List recipes asynchronously."""
-    db_client = await get_neo4j_client()
-    api_client = await get_api_client()
+    db_client = get_neo4j_client()
+    api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
     return await manager.list_recipes(limit=limit)
 

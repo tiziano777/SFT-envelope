@@ -35,7 +35,7 @@ async def get_driver(reinit: bool = False) -> AsyncDriver:
         _driver = AsyncGraphDatabase.driver(
             uri,
             auth=(user, password),
-            max_pool_size=pool_size,
+            max_connection_pool_size=pool_size,
         )
 
     return _driver

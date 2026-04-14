@@ -14,7 +14,7 @@ from streamlit_ui.neo4j_async import AsyncNeo4jClient
 @pytest.mark.asyncio
 async def test_cleanup_closes_api_client():
     """Test that cleanup handler calls api_client.close()."""
-    with patch("streamlit_ui.utils.caching.get_api_client") as mock_get_api:
+    with patch("streamlit_ui.utils.get_api_client") as mock_get_api:
         # Create mock HTTPXClient
         mock_api_client = MagicMock(spec=HTTPXClient)
         mock_api_client.close = AsyncMock()
@@ -33,7 +33,7 @@ async def test_cleanup_closes_api_client():
 @pytest.mark.asyncio
 async def test_cleanup_closes_neo4j_client():
     """Test that cleanup handler calls neo4j_client.close()."""
-    with patch("streamlit_ui.utils.caching.get_neo4j_client") as mock_get_db:
+    with patch("streamlit_ui.utils.get_neo4j_client") as mock_get_db:
         # Create mock AsyncNeo4jClient
         mock_db_client = MagicMock(spec=AsyncNeo4jClient)
         mock_db_client.close = AsyncMock()
@@ -51,7 +51,7 @@ async def test_cleanup_closes_neo4j_client():
 
 def test_cleanup_handles_errors_gracefully():
     """Test that cleanup handler doesn't raise exceptions (graceful shutdown)."""
-    with patch("streamlit_ui.utils.caching.get_api_client") as mock_get_api:
+    with patch("streamlit_ui.utils.get_api_client") as mock_get_api:
         # Make the getter raise an exception
         mock_get_api.side_effect = RuntimeError("Connection failed")
 
@@ -99,7 +99,7 @@ async def test_cleanup_creates_new_event_loop():
         return original_new_event_loop()
 
     with patch("asyncio.new_event_loop", side_effect=mock_new_event_loop):
-        with patch("streamlit_ui.utils.caching.get_api_client") as mock_get_api:
+        with patch("streamlit_ui.utils.get_api_client") as mock_get_api:
             mock_api_client = MagicMock(spec=HTTPXClient)
             mock_api_client.close = AsyncMock()
             mock_get_api.return_value = mock_api_client

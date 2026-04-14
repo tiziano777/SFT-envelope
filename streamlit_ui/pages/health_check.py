@@ -11,19 +11,19 @@ from streamlit_ui.health import (
     check_neo4j_health,
     check_streamlit_health,
 )
-from streamlit_ui.utils.caching import get_api_client, get_config, get_neo4j_client
+from streamlit_ui.utils import get_api_client, get_config, get_neo4j_client
 
 
 # Async helper functions for health checks
 async def check_neo4j_async() -> bool:
     """Check Neo4j health asynchronously."""
-    db_client = await get_neo4j_client()
+    db_client = get_neo4j_client()
     return await check_neo4j_health(db_client)
 
 
 async def check_api_async() -> bool:
     """Check Master API health asynchronously."""
-    api_client = await get_api_client()
+    api_client = get_api_client()
     config = get_config()
     return await check_master_api_health(config.master_api_url, config.master_api_token)
 

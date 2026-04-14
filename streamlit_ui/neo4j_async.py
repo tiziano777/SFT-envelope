@@ -21,12 +21,14 @@ class AsyncNeo4jClient:
         """
         self.uri = uri
         self.user = user
+        self.password = password
         self.pool_size = pool_size
-        self.driver: AsyncDriver = AsyncGraphDatabase.driver(
-            uri,
-            auth=(user, password),
-            max_pool_size=pool_size,
-        )
+        # Do not create a persistent AsyncDriver bound to any particular
+        # event loop. Instead, create and close a driver per call so the
+        # driver and its socket futures are always attached to the same
+        # event loop used for that call. This avoids cross-loop Future
+        # attachment errors when Streamlit or other frameworks manage
+        # their own event loops.
 
     async def run(self, query: str, **kwargs) -> Any:
         """Execute a Cypher query.
@@ -38,9 +40,17 @@ class AsyncNeo4jClient:
         Returns:
             Query result.
         """
-        async with self.driver.session() as session:
-            result = await session.run(query, **kwargs)
-            return result
+        driver = AsyncGraphDatabase.driver(
+            self.uri,
+            auth=(self.user, self.password),
+            max_connection_pool_size=self.pool_size,
+        )
+        try:
+            async with driver.session() as session:
+                result = await session.run(query, **kwargs)
+                return result
+        finally:
+            await driver.close()
 
     async def run_single(self, query: str, **kwargs) -> Optional[dict]:
         """Execute a query expecting a single result.
@@ -52,10 +62,18 @@ class AsyncNeo4jClient:
         Returns:
             Single result record or None.
         """
-        async with self.driver.session() as session:
-            result = await session.run(query, **kwargs)
-            record = await result.single()
-            return dict(record) if record else None
+        driver = AsyncGraphDatabase.driver(
+            self.uri,
+            auth=(self.user, self.password),
+            max_connection_pool_size=self.pool_size,
+        )
+        try:
+            async with driver.session() as session:
+                result = await session.run(query, **kwargs)
+                record = await result.single()
+                return dict(record) if record else None
+        finally:
+            await driver.close()
 
     async def run_list(self, query: str, **kwargs) -> list[dict]:
         """Execute a query returning a list of results.
@@ -67,10 +85,23 @@ class AsyncNeo4jClient:
         Returns:
             List of result records.
         """
-        async with self.driver.session() as session:
-            result = await session.run(query, **kwargs)
-            records = await result.list()
-            return [dict(record) for record in records]
+        driver = AsyncGraphDatabase.driver(
+            self.uri,
+            auth=(self.user, self.password),
+            max_connection_pool_size=self.pool_size,
+        )
+        try:
+            async with driver.session() as session:
+                result = await session.run(query, **kwargs)
+                to_list = getattr(result, "to_list", None)
+                if callable(to_list):
+                    records = await to_list()
+                else:
+                    records = [r async for r in result]
+
+                return [dict(record) for record in records]
+        finally:
+            await driver.close()
 
     async def count_relationships(self, node_id: str, label: str) -> int:
         """Count incoming relationships to a node.
@@ -111,5 +142,5 @@ class AsyncNeo4jClient:
 
     async def close(self) -> None:
         """Close the Neo4j driver."""
-        if self.driver:
-            await self.driver.close()
+        # No persistent driver to close when creating per-call drivers.
+        return None

@@ -8,8 +8,7 @@ import os
 
 import streamlit as st
 
-from streamlit_ui.config import Config
-from streamlit_ui.utils.caching import get_api_client, get_config, get_neo4j_client
+from streamlit_ui.utils import get_api_client, get_config, get_neo4j_client
 
 
 def main() -> None:

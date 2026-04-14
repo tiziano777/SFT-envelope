@@ -85,6 +85,7 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 ## Best Practices
 
 - TDD development
+- Every imported package class or decorator can exists, not invent anything 
 - Ask Questions about choices, especially when a tradeoff emerging
 - Start from a object oriented style, from abstarction to implementations
 - Ensure always the maximum modularity and extendability
