@@ -28,30 +28,37 @@ def run() -> None:
         uploaded_file = st.file_uploader("Upload YAML recipe", type=["yaml", "yml"])
 
         if uploaded_file:
-            yaml_content = uploaded_file.read().decode("utf-8")
-            is_valid, config, errors = validate_recipe_yaml(yaml_content)
-
-            if is_valid:
-                st.success("✓ Recipe validation passed")
-                st.info(f"**Name:** {config.name if config else 'N/A'}")
-
-                if st.button("Save Recipe"):
-                    try:
-                        result = asyncio.run(
-                            manager.create_recipe(
-                                name=getattr(config, "name", uploaded_file.name),
-                                yaml_content=yaml_content,
-                            )
-                        )
-                        st.success(f"✓ Recipe '{result['name']}' created successfully!")
-                        st.toast("Recipe saved!", icon="✓")
-                    except UIError as e:
-                        st.error(f"Error: {e.user_message}")
-                        st.caption(e.details)
+            MAX_FILE_SIZE_MB = 10
+            if uploaded_file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
+                st.error(f"File too large. Max {MAX_FILE_SIZE_MB}MB allowed.")
             else:
-                st.error("✗ Recipe validation failed")
-                for error in errors:
-                    st.error(f"  • {error}")
+                yaml_content = uploaded_file.read().decode("utf-8")
+                is_valid, config, errors = validate_recipe_yaml(yaml_content)
+
+                if is_valid:
+                    st.success("✓ Recipe validation passed")
+                    st.info(f"**Name:** {config.name if config else 'N/A'}")
+
+                    if st.button("Save Recipe", disabled=st.session_state.get("saving_recipe", False)):
+                        st.session_state.saving_recipe = True
+                        try:
+                            result = asyncio.run(
+                                manager.create_recipe(
+                                    name=getattr(config, "name", uploaded_file.name),
+                                    yaml_content=yaml_content,
+                                )
+                            )
+                            st.success(f"✓ Recipe '{result['name']}' created successfully!")
+                            st.toast("Recipe saved!", icon="✓")
+                        except UIError as e:
+                            st.error(f"Error: {e.user_message}")
+                            st.caption(e.details)
+                        finally:
+                            st.session_state.saving_recipe = False
+                else:
+                    st.error("✗ Recipe validation failed")
+                    for error in errors:
+                        st.error(f"  • {error}")
 
     with tab2:
         st.subheader("Browse Recipes")
