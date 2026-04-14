@@ -13,12 +13,12 @@ from streamlit_ui.validation import validate_recipe_yaml
 
 
 # Async helper functions for recipe operations
-async def create_recipe_async(name: str, yaml_content: str) -> dict:
+async def create_recipe_async(name: str, yaml_content: str, description: str = "") -> dict:
     """Create recipe asynchronously."""
     db_client = get_neo4j_client()
     api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
-    return await manager.create_recipe(name=name, yaml_content=yaml_content)
+    return await manager.create_recipe(name=name, yaml_content=yaml_content, description=description)
 
 
 async def search_recipes_async(query: str) -> list[dict]:
@@ -35,6 +35,22 @@ async def list_recipes_async(limit: int = 20) -> list[dict]:
     api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
     return await manager.list_recipes(limit=limit)
+
+
+async def update_recipe_async(recipe_id: str, description: str = "", tags: list[str] | None = None) -> dict:
+    """Update recipe asynchronously."""
+    db_client = get_neo4j_client()
+    api_client = get_api_client()
+    manager = RecipeManager(db_client, api_client)
+    return await manager.update_recipe(recipe_id, description=description, tags=tags)
+
+
+async def delete_recipe_async(recipe_id: str) -> None:
+    """Delete recipe asynchronously."""
+    db_client = get_neo4j_client()
+    api_client = get_api_client()
+    manager = RecipeManager(db_client, api_client)
+    await manager.delete_recipe(recipe_id)
 
 
 def run() -> None:
@@ -95,6 +111,10 @@ def run() -> None:
 
             if recipes:
                 for recipe in recipes:
+                    # Use a stable unique suffix for widget keys. Prefer DB id when available,
+                    # otherwise fall back to recipe name. This avoids DuplicateWidgetID errors
+                    # when multiple recipes share the same name.
+                    key_suffix = recipe.get("id") if recipe.get("id") is not None else recipe.get("name")
                     with st.expander(f"📋 {recipe.get('name', 'N/A')}", expanded=False):
                         col1, col2 = st.columns([3, 1])
 
@@ -102,84 +122,62 @@ def run() -> None:
                             st.write(f"**Description:** {recipe.get('description', 'N/A')}")
                             st.caption(f"Created: {recipe.get('created_at', 'N/A')}")
 
-                            # Show entries
-                            entries = recipe.get('entries', {})
-                            if entries:
-                                st.write("**Entries:**")
-                                for idx, (path, entry_data) in enumerate(entries.items()):
-                                    with st.expander(f"📂 {path}", expanded=False):
-                                        if isinstance(entry_data, dict):
-                                            st.write(f"• **Type:** {entry_data.get('chat_type', 'N/A')}")
-                                            st.write(f"• **Dist ID:** {entry_data.get('dist_id', 'N/A')}")
-                                            st.write(f"• **Samples:** {entry_data.get('samples', 'N/A')}")
-                                            st.write(f"• **Tokens:** {entry_data.get('tokens', 'N/A')}")
-                                            st.write(f"• **Words:** {entry_data.get('words', 'N/A')}")
-
                         with col2:
                             # Edit button
-                            if st.button("✏️ Edit", key=f"edit_{recipe.get('name')}"):
-                                st.session_state[f"edit_recipe_{recipe.get('name')}"] = True
+                            if st.button("✏️ Edit", key=f"edit_{key_suffix}"):
+                                st.session_state[f"edit_recipe_{key_suffix}"] = True
 
                             # Delete button
-                            if st.button("🗑️ Delete", key=f"delete_{recipe.get('name')}"):
-                                st.session_state[f"confirm_delete_{recipe.get('name')}"] = True
+                            if st.button("🗑️ Delete", key=f"delete_{key_suffix}"):
+                                st.session_state[f"confirm_delete_{key_suffix}"] = True
 
                         # Edit modal
-                        if st.session_state.get(f"edit_recipe_{recipe.get('name')}", False):
+                        if st.session_state.get(f"edit_recipe_{key_suffix}", False):
                             st.divider()
                             st.subheader("Edit Recipe")
-                            new_name = st.text_input("Recipe name", value=recipe.get('name', ''), key=f"new_name_{recipe.get('name')}")
-                            new_desc = st.text_area("Description", value=recipe.get('description', ''), key=f"new_desc_{recipe.get('name')}")
+                            new_desc = st.text_area("Description", value=recipe.get('description', ''), key=f"new_desc_{key_suffix}")
 
                             col_save, col_cancel = st.columns(2)
                             with col_save:
-                                if st.button("Save Changes", key=f"save_edit_{recipe.get('name')}"):
+                                if st.button("Save Changes", key=f"save_edit_{key_suffix}"):
                                     try:
-                                        db_client = get_neo4j_client()
-                                        api_client = get_api_client()
-                                        manager = RecipeManager(db_client, api_client)
-                                        result = asyncio.run(manager.update(
-                                            recipe.get('name'),
-                                            new_name=new_name if new_name != recipe.get('name') else None,
+                                        result = asyncio.run(update_recipe_async(
+                                            recipe.get('id'),
                                             description=new_desc
                                         ))
                                         st.success(f"✓ Recipe updated!")
-                                        st.session_state[f"edit_recipe_{recipe.get('name')}"] = False
+                                        st.session_state[f"edit_recipe_{key_suffix}"] = False
                                         st.rerun()
                                     except UIError as e:
                                         st.error(f"Error: {e.user_message}")
 
                             with col_cancel:
-                                if st.button("Cancel", key=f"cancel_edit_{recipe.get('name')}"):
-                                    st.session_state[f"edit_recipe_{recipe.get('name')}"] = False
+                                if st.button("Cancel", key=f"cancel_edit_{key_suffix}"):
+                                    st.session_state[f"edit_recipe_{key_suffix}"] = False
                                     st.rerun()
 
                         # Delete confirmation
-                        if st.session_state.get(f"confirm_delete_{recipe.get('name')}", False):
+                        if st.session_state.get(f"confirm_delete_{key_suffix}", False):
                             st.divider()
                             st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name')}'?")
                             col_confirm, col_cancel = st.columns(2)
 
                             with col_confirm:
-                                if st.button("Yes, delete", key=f"confirm_delete_yes_{recipe.get('name')}", type="primary"):
+                                if st.button("Yes, delete", key=f"confirm_delete_yes_{key_suffix}", type="primary"):
                                     try:
-                                        db_client = get_neo4j_client()
-                                        api_client = get_api_client()
-                                        manager = RecipeManager(db_client, api_client)
-                                        asyncio.run(manager.delete(recipe.get('name')))
+                                        asyncio.run(delete_recipe_async(recipe.get('id')))
                                         st.success(f"✓ Recipe '{recipe.get('name')}' deleted!")
-                                        st.session_state[f"confirm_delete_{recipe.get('name')}"] = False
+                                        st.session_state[f"confirm_delete_{key_suffix}"] = False
                                         st.rerun()
                                     except UIError as e:
                                         st.error(f"Error: {e.user_message}")
 
                             with col_cancel:
-                                if st.button("Cancel", key=f"cancel_delete_{recipe.get('name')}"):
-                                    st.session_state[f"confirm_delete_{recipe.get('name')}"] = False
+                                if st.button("Cancel", key=f"cancel_delete_{key_suffix}"):
+                                    st.session_state[f"confirm_delete_{key_suffix}"] = False
                                     st.rerun()
             else:
                 st.info("No recipes found.")
         except UIError as e:
             st.error(f"Error: {e.user_message}")
             st.caption(e.details)
-

@@ -31,27 +31,51 @@ def main() -> None:
     if "api_token" not in st.session_state:
         st.session_state.api_token = os.getenv("MASTER_API_TOKEN", "")
 
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "Recipes"
+
     # Sidebar navigation
     st.sidebar.title("FineTuning Envelope")
     st.sidebar.write("Master Lineage UI v0.1")
 
+    # Page selection with session state
+    page_options = [
+        "Recipes",
+        "Models",
+        "Experiments",
+        "Components",
+        "Health Check",
+    ]
+
     page = st.sidebar.radio(
         "Navigate",
-        [
-            "Recipes",
-            "Health Check",
-        ],
+        page_options,
+        index=page_options.index(st.session_state.current_page),
     )
 
+    # Update session state when page changes
+    st.session_state.current_page = page
+
     # Dynamic page loading
-    if page == "Recipes":
-        from pages import recipes
-
-        recipes.run()
-    elif page == "Health Check":
-        from pages import health_check
-
-        health_check.run()
+    try:
+        if page == "Recipes":
+            from pages import recipes
+            recipes.run()
+        elif page == "Models":
+            from pages import models
+            models.run()
+        elif page == "Experiments":
+            from pages import experiments
+            experiments.run()
+        elif page == "Components":
+            from pages import components
+            components.run()
+        elif page == "Health Check":
+            from pages import health_check
+            health_check.run()
+    except Exception as e:
+        st.error(f"Error loading page: {str(e)}")
+        st.exception(e)
 
     # Footer
     st.sidebar.divider()
