@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -9,6 +10,8 @@ from typing import Optional
 from streamlit_ui.api_client import HTTPXClient
 from streamlit_ui.errors import DeleteProtectionError, UIError
 from streamlit_ui.neo4j_async import AsyncNeo4jClient
+
+logger = logging.getLogger(__name__)
 
 
 class ModelManager:
@@ -82,6 +85,7 @@ class ModelManager:
         if not result:
             raise UIError("Failed to create model in Neo4j")
 
+        logger.info(f"Model created: id={model_id}, name={model_name}")
         return result
 
     async def list_models(self) -> list[dict]:
@@ -168,6 +172,7 @@ class ModelManager:
         if not result:
             raise UIError(f"Model {model_id} not found")
 
+        logger.info(f"Model updated: id={model_id}")
         return result
 
     async def delete_model(self, model_id: str) -> None:
@@ -186,6 +191,7 @@ class ModelManager:
 
         query = "MATCH (m:Model {id: $id}) DETACH DELETE m"
         await self.db.run(query, id=model_id)
+        logger.warning(f"Model deleted: id={model_id}")
 
     async def check_model_dependencies(self, model_id: str) -> int:
         """Count relationships to this model.

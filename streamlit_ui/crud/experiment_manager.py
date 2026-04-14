@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -9,6 +10,8 @@ from typing import Optional
 from streamlit_ui.api_client import HTTPXClient
 from streamlit_ui.errors import DeleteProtectionError, UIError
 from streamlit_ui.neo4j_async import AsyncNeo4jClient
+
+logger = logging.getLogger(__name__)
 
 
 class ExperimentManager:
@@ -73,6 +76,7 @@ class ExperimentManager:
         if not result:
             raise UIError("Failed to create experiment in Neo4j")
 
+        logger.info(f"Experiment created: id={exp_id}, model_id={model_id}")
         return result
 
     async def list_experiments(self, status: Optional[str] = None) -> list[dict]:
@@ -178,6 +182,7 @@ class ExperimentManager:
         if not result:
             raise UIError(f"Experiment {exp_id} not found")
 
+        logger.info(f"Experiment updated: id={exp_id}")
         return result
 
     async def delete_experiment(self, exp_id: str) -> None:
@@ -196,6 +201,7 @@ class ExperimentManager:
 
         query = "MATCH (e:Experiment {id: $id}) DETACH DELETE e"
         await self.db.run(query, id=exp_id)
+        logger.warning(f"Experiment deleted: id={exp_id}")
 
     async def check_experiment_dependencies(self, exp_id: str) -> int:
         """Count checkpoints for this experiment.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -9,6 +10,8 @@ from typing import Optional
 from streamlit_ui.api_client import HTTPXClient
 from streamlit_ui.errors import DeleteProtectionError, UIError
 from streamlit_ui.neo4j_async import AsyncNeo4jClient
+
+logger = logging.getLogger(__name__)
 
 
 class ComponentManager:
@@ -78,6 +81,7 @@ class ComponentManager:
         if not result:
             raise UIError("Failed to create component in Neo4j")
 
+        logger.info(f"Component created: id={component_id}, opt_code={opt_code}")
         return result
 
     async def list_components(self) -> list[dict]:
@@ -153,6 +157,7 @@ class ComponentManager:
         if not result:
             raise UIError(f"Component {component_id} not found")
 
+        logger.info(f"Component updated: id={component_id}")
         return result
 
     async def delete_component(self, component_id: str) -> None:
@@ -171,6 +176,7 @@ class ComponentManager:
 
         query = "MATCH (c:Component {id: $id}) DETACH DELETE c"
         await self.db.run(query, id=component_id)
+        logger.warning(f"Component deleted: id={component_id}")
 
     async def check_component_dependencies(self, component_id: str) -> int:
         """Count relationships to this component.
