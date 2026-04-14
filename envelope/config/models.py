@@ -469,6 +469,7 @@ class RecipeConfig(BaseModel):
     Maps dataset paths to their metadata entries.
     """
 
+    name: str | None = Field(None, min_length=1, description="Recipe name (typically from filename)")
     entries: dict[str, RecipeEntry] = Field(
         ...,
         min_length=1,

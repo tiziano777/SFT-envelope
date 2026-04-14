@@ -54,7 +54,7 @@ def run() -> None:
                 st.error(f"File too large. Max {MAX_FILE_SIZE_MB}MB allowed.")
             else:
                 yaml_content = uploaded_file.read().decode("utf-8")
-                is_valid, config, errors = validate_recipe_yaml(yaml_content)
+                is_valid, config, errors = validate_recipe_yaml(yaml_content, filename=uploaded_file.name)
 
                 if is_valid:
                     st.success("✓ Recipe validation passed")

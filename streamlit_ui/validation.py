@@ -48,11 +48,12 @@ def _detect_config_type(data: dict) -> str:
     return "envelope"
 
 
-def validate_recipe_yaml(yaml_str: str) -> tuple[bool, Optional[object], list[str]]:
+def validate_recipe_yaml(yaml_str: str, filename: str | None = None) -> tuple[bool, Optional[object], list[str]]:
     """Validate YAML recipe (supports both EnvelopeConfig and RecipeConfig formats).
 
     Args:
         yaml_str: YAML content as string.
+        filename: Optional filename to extract recipe name from.
 
     Returns:
         Tuple of (is_valid, config_obj, error_list).
@@ -78,6 +79,11 @@ def validate_recipe_yaml(yaml_str: str) -> tuple[bool, Optional[object], list[st
             if not load_recipe_yaml:
                 return False, None, ["RecipeConfig loader not available"]
             config = load_recipe_yaml(yaml_str)
+            # Extract name from filename if provided
+            if filename and not config.name:
+                # Remove .yaml/.yml extension
+                name = filename.rsplit(".", 1)[0] if "." in filename else filename
+                config.name = name
         else:
             config = load_yaml_config(yaml_str)
 
