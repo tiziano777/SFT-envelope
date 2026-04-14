@@ -19,7 +19,7 @@ class HTTPXClient:
         """
         self.base_url = base_url
         self.api_token = api_token
-        self.client = httpx.AsyncClient(base_url=base_url)
+        self.client = httpx.AsyncClient(base_url=base_url, timeout=10.0)
 
     async def post(self, endpoint: str, json: dict | None = None) -> httpx.Response:
         """POST request to Master API.
