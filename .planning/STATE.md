@@ -98,6 +98,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260413-imr | Remove OPTIMIZED_WITH relationship and formalize worker daemon naming | 2026-04-13 | e5f5307 | [260413-imr-remove-optimized-with-relationship-and-f](./quick/260413-imr-remove-optimized-with-relationship-and-f/) |
+| 260414-doc | Update documentation and memory after Phase 11 async manual testing verification | 2026-04-14 | 94b7f9b | [260414-doc-phase11-update](./quick/260414-doc-phase11-update/) |
 
 ## Session Continuity
 
