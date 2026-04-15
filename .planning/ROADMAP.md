@@ -207,7 +207,7 @@ Plans:
 
 **Execution Order:**
 Phases execute respecting dependency waves. Within a wave, phases can execute in parallel.
-- Wave 1: 1 | Wave 2: 2, 3, 5 | Wave 3: 4, 6, 8 | Wave 4: 7 | Wave 5: 9 | Wave 6: 10
+- Wave 1: 1 | Wave 2: 2, 3, 5 | Wave 3: 4, 6, 8 | Wave 4: 7 | Wave 5: 9 | Wave 6: 10 | Wave 7: 13 (Maintenance)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -221,3 +221,4 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 | 8. Datamix | 1/1 | Complete | 2026-04-13 |
 | 9. Testing | 2/2 | Created | 2026-04-13 |
 | 10. Documentation | 0/1 | Not started | - |
+| 13. Recipe Management Fix | 2/2 | Complete | 2026-04-15 |
