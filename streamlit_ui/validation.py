@@ -6,6 +6,9 @@ from typing import Optional
 
 import yaml
 from pydantic import ValidationError
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from envelope.config.loader import load_yaml_config, load_recipe_yaml
@@ -31,7 +34,11 @@ def _detect_config_type(data: dict) -> str:
     # Training config has experiment, model, dataset, training at top level
     top_keys = set(data.keys())
 
-    # Check for recipe markers (distribution metadata)
+    # If the YAML explicitly contains an 'entries' mapping, treat as recipe
+    if "entries" in data:
+        return "recipe"
+
+    # Check for recipe markers (distribution metadata) in nested entries
     recipe_markers = {"dist_id", "dist_name", "dist_uri", "samples", "tokens"}
     if any(key in recipe_markers for value in data.values() if isinstance(value, dict) for key in value.keys()):
         return "recipe"
@@ -74,21 +81,24 @@ def validate_recipe_yaml(yaml_str: str, filename: str | None = None) -> tuple[bo
 
         # Detect config type and load with appropriate validator
         config_type = _detect_config_type(data)
+        logger.debug("validate_recipe_yaml: detected config_type=%s (filename=%s) top_keys=%s", config_type, filename, list(data.keys())[:10])
 
         if config_type == "recipe":
             if not load_recipe_yaml:
                 return False, None, ["RecipeConfig loader not available"]
             config = load_recipe_yaml(yaml_str)
-            # Extract name from filename if provided
-            if filename and not config.name:
-                # Remove .yaml/.yml extension
-                name = filename.rsplit(".", 1)[0] if "." in filename else filename
-                config.name = name
+            # Do NOT derive name from filename: name must be provided at top-level of YAML
+            try:
+                entries_count = len(config.entries) if getattr(config, 'entries', None) else 0
+                logger.info("Loaded RecipeConfig: name=%s entries=%d", getattr(config, 'name', None), entries_count)
+            except Exception:
+                logger.exception("Failed to count entries on RecipeConfig")
         else:
             config = load_yaml_config(yaml_str)
 
         return True, config, []
     except ValueError as e:
+        logger.warning("Validation failed: %s", str(e))
         return False, None, [f"Invalid YAML format: {str(e)}"]
     except ValidationError as e:
         errors = []
@@ -96,6 +106,8 @@ def validate_recipe_yaml(yaml_str: str, filename: str | None = None) -> tuple[bo
             field = ".".join(str(x) for x in err["loc"])
             msg = err["msg"]
             errors.append(f"{field}: {msg}")
+        logger.warning("Pydantic validation errors: %s", errors)
         return False, None, errors
     except Exception as e:
+        logger.exception("Unexpected validation error: %s", str(e))
         return False, None, [f"Validation error: {str(e)}"]

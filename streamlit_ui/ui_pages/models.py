@@ -147,27 +147,30 @@ def run() -> None:
                 model_id = model_names[selected_name]
                 model = asyncio.run(get_model_async(model_id))
 
-                with st.form("edit_model_form"):
-                    version = st.text_input("Version", value=model.get("version", ""))
-                    url = st.text_input("URL", value=model.get("url", ""))
-                    doc_url = st.text_input("Doc URL", value=model.get("doc_url", ""))
-                    description = st.text_area("Description", value=model.get("description", ""))
-                    submitted = st.form_submit_button("Update Model")
+                if model is None:
+                    st.error(f"Model not found: {selected_name} (id={model_id})")
+                else:
+                    with st.form("edit_model_form"):
+                        version = st.text_input("Version", value=model.get("version", ""))
+                        url = st.text_input("URL", value=model.get("url", ""))
+                        doc_url = st.text_input("Doc URL", value=model.get("doc_url", ""))
+                        description = st.text_area("Description", value=model.get("description", ""))
+                        submitted = st.form_submit_button("Update Model")
 
-                    if submitted:
-                        try:
-                            asyncio.run(
-                                update_model_async(
-                                    model_id,
-                                    version=version,
-                                    url=url,
-                                    doc_url=doc_url,
-                                    description=description,
+                        if submitted:
+                            try:
+                                asyncio.run(
+                                    update_model_async(
+                                        model_id,
+                                        version=version,
+                                        url=url,
+                                        doc_url=doc_url,
+                                        description=description,
+                                    )
                                 )
-                            )
-                            st.success("✓ Model updated!")
-                        except UIError as e:
-                            st.error(f"Error: {e.user_message}")
+                                st.success("✓ Model updated!")
+                            except UIError as e:
+                                st.error(f"Error: {e.user_message}")
         except UIError as e:
             st.error(f"Error: {e.user_message}")
 

@@ -456,7 +456,6 @@ class RecipeEntry(BaseModel):
     dist_uri: str = Field(..., min_length=1, description="Path or URI to distribution")
     replica: int = Field(1, ge=1, description="Replication factor (N× oversampling)")
     samples: int = Field(..., gt=0, description="Total number of samples in distribution")
-    schema_template: dict[str, Any] | None = Field(None, description="JSON Schema defining record structure")
     system_prompt: list[str] | None = Field(None, description="System prompt templates")
     system_prompt_name: list[str] | None = Field(None, description="System prompt names")
     tokens: int = Field(..., gt=0, description="Total token count")
@@ -474,7 +473,7 @@ class RecipeConfig(BaseModel):
         Use ensure_name(filename) to derive name from filename before persistence.
         Filename format: "my_recipe.yaml" → "my_recipe"
     """
-
+    recipe_id: str | None = Field(None, description="Unique recipe identifier (optional, can be set to name or UUID)")
     name: str | None = Field(None, min_length=1, description="Recipe name (must be unique)")
     entries: dict[str, RecipeEntry] = Field(
         ...,
