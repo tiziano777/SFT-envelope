@@ -10,7 +10,7 @@ import yaml
 
 from envelope.config.models import RecipeConfig
 from streamlit_ui.api_client import HTTPXClient
-from streamlit_ui.errors import UIError
+from streamlit_ui.errors import UIError, DuplicateRecipeError
 from streamlit_ui.neo4j_async import AsyncNeo4jClient
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,7 @@ class RecipeManager:
         Raises:
             UIError: On database query failure.
         """
+        logger.debug(f"Querying recipe by name: {name}")
         try:
             query = """
             MATCH (r:Recipe {name: $name})
@@ -94,7 +95,10 @@ class RecipeManager:
             """
             result = await self.db.query(query, {"name": name})
             if result:
+                entry_count = len(result[0].get('entries', {})) if result[0].get('entries') else 0
+                logger.debug(f"Recipe found: {name} (entry_count={entry_count})")
                 return result[0]
+            logger.debug(f"Recipe not found: {name}")
             return None
         except Exception as e:
             logger.error(f"Failed to get recipe by name: {e}")
@@ -117,17 +121,25 @@ class RecipeManager:
             Created recipe data.
 
         Raises:
-            UIError: If name already exists or database query fails.
+            DuplicateRecipeError: If name already exists.
+            UIError: If database query fails.
         """
         # Check uniqueness
+        logger.debug(f"Checking recipe uniqueness: name={name}")
         existing = await self.get_by_name(name)
         if existing:
-            raise UIError(
-                user_message=f"⚠️ Recipe name already exists: '{name}'",
-                details="Change the recipe name or rename the YAML file before uploading."
-            )
+            logger.warning(f"Recipe name already exists: {name}")
+            # Generate alternative name suggestions
+            suggestions = [
+                f"{name}_v1",
+                f"{name}_v2",
+                f"{name}_backup",
+            ]
+            raise DuplicateRecipeError(name, recovery_suggestions=suggestions)
 
         try:
+            entry_count = len(entries)
+            logger.info(f"Inserting recipe: name={name}, entry_count={entry_count}")
             query = """
             CREATE (r:Recipe {
                 name: $name,
@@ -143,12 +155,13 @@ class RecipeManager:
                 "entries": entries
             })
             if result:
+                logger.info(f"Recipe inserted successfully: name={result[0]['name']}")
                 return result[0]
             raise UIError("Failed to create recipe")
         except Exception as e:
-            if isinstance(e, UIError):
+            if isinstance(e, (UIError, DuplicateRecipeError)):
                 raise
-            logger.error(f"Failed to create recipe: {e}")
+            logger.error(f"Recipe insertion failed: {name}", exc_info=True)
             raise UIError(f"Failed to create recipe: {str(e)}")
 
     async def create_recipe(
@@ -177,6 +190,7 @@ class RecipeManager:
             UIError: If YAML parsing or creation fails.
         """
         try:
+            logger.debug(f"Recipe upload: filename={filename}, yaml_size={len(yaml_content)} bytes")
             data = yaml.safe_load(yaml_content)
             if not isinstance(data, dict):
                 raise UIError("YAML must contain a dictionary")
@@ -196,12 +210,12 @@ class RecipeManager:
                 logger.debug(f"Wrapped format: {len(data['entries'])} entries")
 
             config = RecipeConfig(**data)
+            logger.info(f"Recipe YAML parsed: name={config.name or 'derived'}, entries={len(config.entries)}")
 
             # Call ensure_name() if filename provided to set name if still None
             if filename:
                 config.ensure_name(filename)
 
-            # TODO: Log entry count before persistence
             # Convert Pydantic RecipeEntry models to plain dicts for Neo4j storage
             entries_dict = {
                 path: entry.model_dump(mode="json", exclude_none=True)
@@ -215,16 +229,21 @@ class RecipeManager:
                 config=config
             )
 
-            # TODO: Log final recipe name and source (YAML field, filename, or parameter)
-            return await self.create(
+            logger.info(f"Creating recipe: name={final_name}, entry_count={len(entries_dict)}")
+            result = await self.create(
                 name=final_name,
                 entries=entries_dict,  # Plain dict, not Pydantic models
                 description=description or data.get("description", "")
             )
+            logger.info(f"Recipe created successfully: name={result['name']}, entry_count={len(entries_dict)}")
+            return result
         except ValueError as e:
             raise UIError(f"YAML parsing error: {str(e)}")
+        except (UIError, DuplicateRecipeError) as e:
+            # Let UIError and DuplicateRecipeError pass through
+            raise
         except Exception as e:
-            logger.error(f"Failed to create recipe from YAML: {e}")
+            logger.error(f"Recipe creation failed: {str(e)}", exc_info=True)
             raise UIError(f"Failed to create recipe: {str(e)}")
 
     async def update(
@@ -267,6 +286,7 @@ class RecipeManager:
             if not updates:
                 return existing
 
+            logger.info(f"Updating recipe: name={name}, fields={list(updates.keys())}")
             set_clause = ", ".join([f"r.{k} = ${k}" for k in updates.keys()])
             query = f"""
             MATCH (r:Recipe {{name: $old_name}})
@@ -277,12 +297,13 @@ class RecipeManager:
             params = {"old_name": name, **updates}
             result = await self.db.query(query, params)
             if result:
+                logger.info(f"Recipe updated: {name}")
                 return result[0]
             raise UIError("Failed to update recipe")
         except Exception as e:
             if isinstance(e, UIError):
                 raise
-            logger.error(f"Failed to update recipe: {e}")
+            logger.error(f"Recipe update failed: {name}", exc_info=True)
             raise UIError(f"Failed to update recipe: {str(e)}")
 
     async def delete(self, name: str) -> None:
@@ -300,11 +321,12 @@ class RecipeManager:
             raise UIError(f"Recipe '{name}' not found")
 
         try:
+            logger.info(f"Deleting recipe: {name}")
             query = "MATCH (r:Recipe {name: $name}) DELETE r"
             await self.db.query(query, {"name": name})
-            logger.info(f"Deleted recipe: {name}")
+            logger.info(f"Recipe deleted: {name}")
         except Exception as e:
-            logger.error(f"Failed to delete recipe: {e}")
+            logger.error(f"Recipe deletion failed: {name}", exc_info=True)
             raise UIError(f"Failed to delete recipe: {str(e)}")
 
     async def list_all(self) -> list[dict]:
@@ -317,6 +339,7 @@ class RecipeManager:
             UIError: On database query failure.
         """
         try:
+            logger.debug("Listing all recipes")
             query = """
             MATCH (r:Recipe)
             RETURN r.name as name, r.description as description,
@@ -324,6 +347,7 @@ class RecipeManager:
             ORDER BY r.created_at DESC
             """
             result = await self.db.query(query)
+            logger.debug(f"Found {len(result)} recipes")
             return result or []
         except Exception as e:
             logger.error(f"Failed to list recipes: {e}")
@@ -342,6 +366,7 @@ class RecipeManager:
             UIError: On database query failure.
         """
         try:
+            logger.debug(f"Listing recipes (limit={limit})")
             query = """
             MATCH (r:Recipe)
             RETURN r.name as name, r.description as description,
@@ -350,6 +375,7 @@ class RecipeManager:
             LIMIT $limit
             """
             result = await self.db.query(query, {"limit": limit})
+            logger.debug(f"Found {len(result) if result else 0} recipes")
             return result or []
         except Exception as e:
             logger.error(f"Failed to list recipes: {e}")
@@ -368,6 +394,7 @@ class RecipeManager:
             UIError: On database query failure.
         """
         try:
+            logger.debug(f"Searching recipes: query={query}")
             cypher_query = """
             MATCH (r:Recipe)
             WHERE toLower(r.name) CONTAINS toLower($query)
@@ -376,6 +403,7 @@ class RecipeManager:
             ORDER BY r.created_at DESC
             """
             result = await self.db.query(cypher_query, {"query": query})
+            logger.debug(f"Found {len(result) if result else 0} recipes matching '{query}'")
             return result or []
         except Exception as e:
             logger.error(f"Failed to search recipes: {e}")
