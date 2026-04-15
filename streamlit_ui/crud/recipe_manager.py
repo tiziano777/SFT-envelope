@@ -107,8 +107,12 @@ class RecipeManager:
     async def create_recipe(self, name: str, yaml_content: str) -> dict:
         """Create recipe from YAML content.
 
+        Supports two YAML formats:
+        1. Wrapped format: {name: "recipe_name", entries: {path: {...}}}
+        2. Entries-only format (auto-wrapped): {path1: {...}, path2: {...}}
+
         Args:
-            name: Recipe name.
+            name: Recipe name (used if YAML doesn't specify one).
             yaml_content: YAML content string.
 
         Returns:
@@ -121,6 +125,20 @@ class RecipeManager:
             data = yaml.safe_load(yaml_content)
             if not isinstance(data, dict):
                 raise UIError("YAML must contain a dictionary")
+
+            # Auto-detect format: if 'entries' key exists, assume wrapped format
+            # Otherwise, treat entire dict as entries (URI-based format)
+            if "entries" not in data:
+                logger.debug(f"Auto-wrapping entries-only YAML format: {len(data)} entries detected")
+                # All keys except metadata fields are treated as URIs/entries
+                metadata_keys = {"name", "description"}
+                entries = {k: v for k, v in data.items() if k not in metadata_keys}
+                data = {
+                    "name": data.get("name") or name,
+                    "entries": entries if entries else data,  # Use extracted entries, or all data if no metadata found
+                    "description": data.get("description", "")
+                }
+                logger.debug(f"Wrapped format: {len(data['entries'])} entries, name={data['name']}")
 
             config = RecipeConfig(**data)
             # Convert Pydantic RecipeEntry models to plain dicts for Neo4j storage

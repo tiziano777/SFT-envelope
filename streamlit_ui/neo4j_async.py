@@ -154,3 +154,29 @@ class AsyncNeo4jClient:
         """Close the Neo4j driver."""
         # No persistent driver to close when creating per-call drivers.
         return None
+
+    async def ensure_recipe_constraints(self) -> None:
+        """Ensure Recipe node uniqueness constraint exists.
+
+        Creates a unique constraint on Recipe.name if it doesn't already exist.
+        This enforces uniqueness at the DB level, preventing duplicate recipe names.
+        """
+        try:
+            # Create unique constraint if it doesn't exist (idempotent in Neo4j 4.4+)
+            query = "CREATE CONSTRAINT unique_recipe_name IF NOT EXISTS FOR (r:Recipe) REQUIRE r.name IS UNIQUE"
+            driver = AsyncGraphDatabase.driver(
+                self.uri,
+                auth=(self.user, self.password),
+                max_connection_pool_size=self.pool_size,
+            )
+            try:
+                async with driver.session() as session:
+                    await session.run(query)
+            finally:
+                await driver.close()
+        except Exception as e:
+            # Log but don't fail if constraint creation fails
+            # (may already exist or have different syntax in older Neo4j versions)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to create Recipe uniqueness constraint: {e}")

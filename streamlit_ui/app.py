@@ -34,6 +34,16 @@ def main() -> None:
     if "current_page" not in st.session_state:
         st.session_state.current_page = "Recipes"
 
+    # Ensure Neo4j constraints exist (only happens once per session)
+    if "neo4j_constraints_created" not in st.session_state:
+        try:
+            db_client = get_neo4j_client()
+            asyncio.run(db_client.ensure_recipe_constraints())
+            st.session_state.neo4j_constraints_created = True
+        except Exception as e:
+            # Log warning but don't fail if constraint setup fails
+            st.warning(f"Could not ensure Neo4j constraints: {e}")
+
     # Sidebar navigation
     st.sidebar.title("FineTuning Envelope")
     
