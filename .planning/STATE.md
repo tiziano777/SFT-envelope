@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: complete
-stopped_at: Completed 12-recipe-ui (TDDD approach, full test suite passing)
-last_updated: "2026-04-14T00:00:00Z"
-last_activity: 2026-04-14
+status: in-progress
+stopped_at: Completed 13-02-PLAN (Phase 13 Wave 2 - Logging Infrastructure + Error Recovery)
+last_updated: "2026-04-15T00:00:00Z"
+last_activity: 2026-04-15
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 23
-  completed_plans: 25
+  total_phases: 14
+  completed_phases: 13
+  total_plans: 27
+  completed_plans: 27
   percent: 100
 ---
 
@@ -21,38 +21,58 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** Ogni esperimento di fine-tuning e' tracciabile, riproducibile e collegato ai suoi predecessori senza azioni manuali.
-**Current focus:** Phase 12 COMPLETE — Recipe UI improvements + CRUD operations
+**Current focus:** Phase 13 Wave 2 COMPLETE — Structured Logging + Error Recovery UI
 
 ## Current Position
 
-Phase: 12 (completed) / 9 (deferred)
-Plan: Phase 12 complete (3 waves, 33/33 tests ✅). Phase 9 plans marked DEFERRED (E2E test suite).
-Status: Phase 12 recipe management system fully operational. Phase 9 deferred (pending stabilization).
-Last activity: 2026-04-14 — Phase 12 TDDD implementation complete, all tests passing
+Phase: 13 (Wave 2 complete) / 9 (deferred)
+Plan: Phase 13-02 complete (structured logging + duplicate recovery). Phase 13-01 complete (filename-based names + DDL). Phase 9 E2E tests marked DEFERRED.
+Status: Phase 13 recipe management system with full observability. Logging infrastructure operational. Error recovery UI tested.
+Last activity: 2026-04-15 — Phase 13-02 execution complete, all 34 recipe tests passing
 
 Progress: [██████████] 100%
 
-## Recent Completion: Phase 12
+## Recent Completion: Phase 13-02
 
-**Phase 12 — Recipe UI Improvements + CRUD Operations (COMPLETE ✅)**
+**Phase 13-02 — Logging Infrastructure + Error Recovery UI (COMPLETE ✅)**
 
 Deliverables:
-- RecipeManager with 8 CRUD async methods (create, read, update, delete, search, list)
-- Unique name constraints (model-level Pydantic + database-level Neo4j)
-- Streamlit UI enhancements: minimal sidebar, expandable entries, edit/delete modals
-- All 11 Recipe CRUD tests + 22 full suite tests (33/33 passing)
-- Neo4j async operations re-validated
+- Structured logging on all RecipeManager CRUD operations (get, create, update, delete, list, search)
+- DuplicateRecipeError exception with auto-generated recovery suggestions (v1, v2, backup variants)
+- Recipe upload UI with duplicate detection and 3-path recovery flow (alt name, rename file, cancel)
+- Entry count display before/after recipe creation
+- Comprehensive E2E test suite with 10 new tests covering happy path + recovery scenarios
+- Audit trail for all operations with recipe name and entry count in all logs
 
-Test Coverage: 33/33 (100%) — Waves 1-3 all passing
-- Wave 1: Model & Backend (11/11 TDDD tests)
-- Wave 2: Streamlit UI (full redesign with safeguards)
-- Wave 3: Full integration (33/33 end-to-end)
+Test Coverage: 34/34 (100%) — All recipe tests passing
+- 24 existing recipe manager tests (test_recipes.py)
+- 10 new E2E recipe workflow tests (test_e2e_recipe_workflow.py)
+- Logging validation with caplog fixture
+- Recovery flow testing (duplicate → suggestion → retry → success)
 
-Status: Production-ready. Recipe management system operational.
+Status: Production-ready. Recipe management system with full operational observability and user-friendly error recovery.
 
-See: .planning/phases/12/SUMMARY.md
+See: .planning/phases/13-recipe-management-fix/13-02-SUMMARY.md
 
-**Deferred:** Phase 9 E2E test suite (conftest fixtures, daemon lifecycle tests, merge strategy tests) — designed but not executed. Remains valid design; implementation deferred pending further prioritization.
+## Recent Completion: Phase 13-01
+
+**Phase 13-01 — Filename-Based Names + Neo4j DDL (COMPLETE ✅)**
+
+Deliverables:
+- RecipeConfig.ensure_name(filename) method for filename-based name extraction
+- RecipeManager._extract_recipe_name() with priority logic (param > YAML > filename)
+- Neo4j DDL schema_init.cypher with idempotent CREATE CONSTRAINT IF NOT EXISTS
+- app.ensure_schema_initialized() function for startup schema setup
+- Backward compatibility maintained for all existing calls
+
+Test Coverage: 24/24 passing (recipes tests)
+- Name derivation from filename fallback
+- Priority logic validation (param > YAML > filename)
+- Filename edge case handling
+
+Status: Production-ready. Schema initialization operational at app startup.
+
+See: .planning/phases/13-recipe-management-fix/13-01-SUMMARY.md
 
 ## Performance Metrics
 
