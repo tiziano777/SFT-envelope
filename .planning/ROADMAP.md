@@ -30,7 +30,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Datamix** - Multi-source config, DatamixLoader, replica oversampling, backward compatibility
 - [ ] **Phase 9: Testing** - E2E suite with simulate_worker/master, handshake/checkpoint/config/daemon tests
 - [ ] **Phase 10: Documentation** - Update workflow.md, README, existing docs, and new lineage docs
-- [ ] **Phase 13: Recipe Management Fix** - Filename-based recipe names, Neo4j DDL constraints, comprehensive logging, error recovery
+- [x] **Phase 13: Recipe Management Fix** - Filename-based recipe names, Neo4j DDL constraints, comprehensive logging, error recovery
+- [ ] **Phase 13.1: Neo4j Schema Consolidation** (INSERTED) - Eliminate database/schema_init.cypher redundancy, create complete schema (nodes/edges/constraints/triggers from Pydantic models), populate seed data (Component Nodes and Models)
 
 ## Phase Details
 
@@ -203,6 +204,21 @@ Plans:
 - [x] 13-01-PLAN.md — Filename-based names, Neo4j DDL constraint creation, validation error handling
 - [x] 13-02-PLAN.md — Logging infrastructure, error messages, user recovery flows, E2E test coverage
 
+### Phase 13.1: Neo4j Schema Consolidation (INSERTED)
+**Goal**: Consolidate Neo4j schema into version-controlled Cypher files with complete node/edge definitions derived from Pydantic models and seed data initialization
+**Depends on**: Phase 13 (Recipe Management Fix)
+**Requirements**: SCHEMA-01, SCHEMA-02, SCHEMA-03
+**Success Criteria** (what must be TRUE):
+  1. database/schema_init.cypher is eliminated; schema consolidated into master/neo4j/ (01-schema.cypher, 02-seeds.cypher)
+  2. master/neo4j/01-schema.cypher is idempotent and complete: node types (Recipe, Model, Experiment, Checkpoint, Component) with all properties from Pydantic models, edge types with cardinality, constraints, triggers, indexes
+  3. master/neo4j/02-seeds.cypher populates initial Component Nodes (all technique + framework combinations) and core Models (no-op if already exist)
+  4. Schema initialization at Docker startup runs all Cypher files in order (01-schema.cypher → 02-seeds.cypher)
+  5. All 5 node types and relationship types are fully documented in Cypher comments with Pydantic field mappings
+**Plans**: 1 plan
+
+Plans:
+- [ ] 13-01-PLAN.md — Complete schema consolidation: Cypher generation from Pydantic models, seed data initialization, idempotent execution
+
 ## Progress
 
 **Execution Order:**
@@ -222,3 +238,4 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 | 9. Testing | 2/2 | Created | 2026-04-13 |
 | 10. Documentation | 0/1 | Not started | - |
 | 13. Recipe Management Fix | 2/2 | Complete | 2026-04-15 |
+| 13.1. Neo4j Schema Consolidation | 0/1 | Not started | - |

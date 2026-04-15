@@ -33,6 +33,7 @@ class RecipeNode(BaseNode):
     modified: datetime
     derived_from: str | None = None
     config_yaml: str = ""
+    entries: list[dict[str, Any]] = Field(default_factory=list, description="Recipe entries (dataset metadata)")
 
 
 class ModelNode(BaseNode):
@@ -50,20 +51,30 @@ class ModelNode(BaseNode):
 class ExperimentNode(BaseNode):
     """Experiment node -- core tracking entity for a training run."""
 
-    exp_id: str = Field(..., min_length=1)
+    exp_id: str = Field(..., min_length=1, description="Unique experiment ID")
     model_id: str = ""
-    status: str = "RUNNING"
+    status: str = Field("RUNNING", description="RUNNING | COMPLETED | FAILED | PAUSED")
     exit_status: str | None = None
     exit_msg: str | None = None
-    hash_committed_code: str = ""
+    strategy: str = Field("", description="NEW | RESUME | BRANCH | RETRY")
+
+    # Hash fields for handshake detection (Phase 2 Database Layer)
+    config_hash: str = Field("", description="SHA256 of config.yaml")
+    code_hash: str = Field("", description="SHA256 of train.py + rewards/*")
+    req_hash: str = Field("", description="SHA256 of requirements.txt")
+
+    # Textual content snapshots (frozen at handshake)
     config: str = ""
     train: str = ""
     rewards: list[str] = Field(default_factory=list)
     rewards_filenames: list[str] = Field(default_factory=list)
     requirements: str = ""
-    hyperparams_json: str = ""
+
+    # Scaffold URIs
     scaffold_local_uri: str = ""
     scaffold_remote_uri: str = ""
+
+    # Metadata
     usable: bool = True
     manual_save: bool = False
     metrics_uri: str = ""
@@ -91,11 +102,10 @@ class ComponentNode(BaseNode):
     If a (technique, framework) combo is not supported, the Component doesn't exist.
     This enforces compatibility at the data model level.
 
-    Example: (lora_grpo, unsloth) exists, (qora, unsloth) doesn't exist → query returns None
+    Example: (grpo, unsloth) exists, (unknown, unsloth) doesn't exist → query returns None
     """
 
-    opt_code: str = Field(..., min_length=1, description="Optimization code/identifier")
-    technique_code: str = Field(..., min_length=1, description="Technique code (e.g., lora_grpo)")
-    framework_code: str = Field(..., min_length=1, description="Framework code (e.g., unsloth)")
+    technique_code: str = Field(..., min_length=1, description="Technique code (e.g., grpo, sft)")
+    framework_code: str = Field(..., min_length=1, description="Framework code (e.g., unsloth, trl)")
     docs_url: str = ""
     description: str = ""
