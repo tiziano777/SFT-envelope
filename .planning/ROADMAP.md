@@ -200,8 +200,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Filename-based names, Neo4j DDL constraint creation, validation error handling
-- [ ] 13-02-PLAN.md — Logging infrastructure, error messages, user recovery flows, E2E test coverage
+- [x] 13-01-PLAN.md — Filename-based names, Neo4j DDL constraint creation, validation error handling
+- [x] 13-02-PLAN.md — Logging infrastructure, error messages, user recovery flows, E2E test coverage
 
 ## Progress
 
