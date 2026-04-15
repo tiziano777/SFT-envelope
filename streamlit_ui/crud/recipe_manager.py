@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 import yaml
@@ -27,6 +28,52 @@ class RecipeManager:
         """
         self.db = db_client
         self.api = api_client
+
+    def _extract_recipe_name(
+        self,
+        name_param: str | None,
+        filename: str | None,
+        config: RecipeConfig
+    ) -> str:
+        """Extract final recipe name from multiple sources with priority logic.
+
+        Priority: name_param (explicit) > config.name (from YAML) > filename (extracted)
+
+        Args:
+            name_param: Explicitly provided name parameter.
+            filename: Source filename for fallback extraction.
+            config: RecipeConfig instance (may have name from YAML).
+
+        Returns:
+            Final recipe name.
+
+        Raises:
+            ValueError: If name cannot be derived from any source.
+        """
+        # Priority 1: Explicit parameter
+        if name_param:
+            return name_param
+
+        # Priority 2: Name from YAML
+        if config.name:
+            return config.name
+
+        # Priority 3: Extract from filename
+        if filename:
+            path = Path(filename)
+            name_with_extension = path.name
+            if "." in name_with_extension:
+                extracted_name = name_with_extension.rsplit(".", 1)[0]
+            else:
+                extracted_name = name_with_extension
+
+            if extracted_name and extracted_name.strip():
+                return extracted_name
+
+        # No name could be derived
+        raise ValueError(
+            "Recipe name required: provide 'name' field in YAML or upload file with .yaml/.yml extension"
+        )
 
     async def get_by_name(self, name: str) -> Optional[dict]:
         """Retrieve recipe by name.
@@ -104,7 +151,13 @@ class RecipeManager:
             logger.error(f"Failed to create recipe: {e}")
             raise UIError(f"Failed to create recipe: {str(e)}")
 
-    async def create_recipe(self, name: str, yaml_content: str) -> dict:
+    async def create_recipe(
+        self,
+        name: str | None = None,
+        yaml_content: str = "",
+        filename: str | None = None,
+        description: str = ""
+    ) -> dict:
         """Create recipe from YAML content.
 
         Supports two YAML formats:
@@ -112,8 +165,10 @@ class RecipeManager:
         2. Entries-only format (auto-wrapped): {path1: {...}, path2: {...}}
 
         Args:
-            name: Recipe name (used if YAML doesn't specify one).
+            name: Optional explicit recipe name (highest priority).
             yaml_content: YAML content string.
+            filename: Source filename for fallback name extraction.
+            description: Optional recipe description.
 
         Returns:
             Created recipe data.
@@ -134,22 +189,37 @@ class RecipeManager:
                 metadata_keys = {"name", "description"}
                 entries = {k: v for k, v in data.items() if k not in metadata_keys}
                 data = {
-                    "name": data.get("name") or name,
+                    "name": data.get("name"),
                     "entries": entries if entries else data,  # Use extracted entries, or all data if no metadata found
                     "description": data.get("description", "")
                 }
-                logger.debug(f"Wrapped format: {len(data['entries'])} entries, name={data['name']}")
+                logger.debug(f"Wrapped format: {len(data['entries'])} entries")
 
             config = RecipeConfig(**data)
+
+            # Call ensure_name() if filename provided to set name if still None
+            if filename:
+                config.ensure_name(filename)
+
+            # TODO: Log entry count before persistence
             # Convert Pydantic RecipeEntry models to plain dicts for Neo4j storage
             entries_dict = {
                 path: entry.model_dump(mode="json", exclude_none=True)
                 for path, entry in config.entries.items()
             }
+
+            # Extract final name with priority: name_param > config.name > filename
+            final_name = self._extract_recipe_name(
+                name_param=name,
+                filename=filename,
+                config=config
+            )
+
+            # TODO: Log final recipe name and source (YAML field, filename, or parameter)
             return await self.create(
-                name=name or config.name or "untitled",
+                name=final_name,
                 entries=entries_dict,  # Plain dict, not Pydantic models
-                description=data.get("description", "")
+                description=description or data.get("description", "")
             )
         except ValueError as e:
             raise UIError(f"YAML parsing error: {str(e)}")

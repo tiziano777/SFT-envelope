@@ -7,6 +7,7 @@ for configuration structure across the entire envelope system.
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -467,6 +468,11 @@ class RecipeConfig(BaseModel):
     """Configuration for recipe/distribution metadata (separate from training setup).
 
     Maps dataset paths to their metadata entries.
+
+    Note:
+        name can be None at parse time (recipe from YAML without 'name' field).
+        Use ensure_name(filename) to derive name from filename before persistence.
+        Filename format: "my_recipe.yaml" → "my_recipe"
     """
 
     name: str | None = Field(None, min_length=1, description="Recipe name (must be unique)")
@@ -484,3 +490,37 @@ class RecipeConfig(BaseModel):
         # Note: Uniqueness is enforced at DB layer (Neo4j constraint).
         # This validator ensures name is valid before DB checks.
         return self
+
+    def ensure_name(self, filename: str) -> None:
+        """Extract recipe name from filename and set if name is currently None.
+
+        Extracts stem (filename without extension) from provided filename.
+        Handles edge cases like "recipe.yaml.bak" → "recipe.yaml".
+
+        Args:
+            filename: Source filename (e.g., "my_recipe.yaml").
+
+        Raises:
+            ValueError: If extracted name is empty or whitespace-only.
+        """
+        if self.name is not None:
+            # Already has a name, don't override
+            return
+
+        # Extract stem using pathlib, handling edge cases
+        path = Path(filename)
+        # Use rsplit to handle cases like "recipe.yaml.bak"
+        name_with_extension = path.name
+        if "." in name_with_extension:
+            # Remove only the last extension
+            extracted_name = name_with_extension.rsplit(".", 1)[0]
+        else:
+            extracted_name = name_with_extension
+
+        # Validate extracted name
+        if not extracted_name or not extracted_name.strip():
+            raise ValueError(
+                f"Recipe name required: provide 'name' field in YAML or upload file with valid filename"
+            )
+
+        self.name = extracted_name
