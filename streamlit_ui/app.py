@@ -36,7 +36,7 @@ def main() -> None:
 
     # Sidebar navigation
     st.sidebar.title("FineTuning Envelope")
-    st.sidebar.write("Master Lineage UI v0.1")
+    
 
     # Page selection with session state
     page_options = [
@@ -59,19 +59,19 @@ def main() -> None:
     # Dynamic page loading
     try:
         if page == "Recipes":
-            from pages import recipes
+            from ui_pages import recipes
             recipes.run()
         elif page == "Models":
-            from pages import models
+            from ui_pages import models
             models.run()
         elif page == "Experiments":
-            from pages import experiments
+            from ui_pages import experiments
             experiments.run()
         elif page == "Components":
-            from pages import components
+            from ui_pages import components
             components.run()
         elif page == "Health Check":
-            from pages import health_check
+            from ui_pages import health_check
             health_check.run()
     except Exception as e:
         st.error(f"Error loading page: {str(e)}")

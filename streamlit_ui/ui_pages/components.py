@@ -189,4 +189,3 @@ def run() -> None:
                     st.error(f"Delete Protected: {e.user_message}")
         except UIError as e:
             st.error(f"Error: {e.user_message}")
-    

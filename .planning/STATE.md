@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: complete
-stopped_at: Completed 11-streamlit-ui (manual async testing verification)
+stopped_at: Completed 12-recipe-ui (TDDD approach, full test suite passing)
 last_updated: "2026-04-14T00:00:00Z"
 last_activity: 2026-04-14
 progress:
-  total_phases: 10
-  completed_phases: 11
-  total_plans: 21
-  completed_plans: 24
+  total_phases: 12
+  completed_phases: 12
+  total_plans: 23
+  completed_plans: 25
   percent: 100
 ---
 
@@ -21,30 +21,36 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** Ogni esperimento di fine-tuning e' tracciabile, riproducibile e collegato ai suoi predecessori senza azioni manuali.
-**Current focus:** Phase 09 — e2e-testing
+**Current focus:** Phase 12 COMPLETE — Recipe UI improvements + CRUD operations
 
 ## Current Position
 
-Phase: 11 (completed) / 9 (deferred)
-Plan: Phase 11 complete (3 plans + manual verification). Phase 9 plans marked DEFERRED (E2E test suite).
-Status: Phase 11 async migrations complete. Phase 9 deferred (pending stabilization).
-Last activity: 2026-04-14 — Phase 11 async pattern manual testing verification complete
+Phase: 12 (completed) / 9 (deferred)
+Plan: Phase 12 complete (3 waves, 33/33 tests ✅). Phase 9 plans marked DEFERRED (E2E test suite).
+Status: Phase 12 recipe management system fully operational. Phase 9 deferred (pending stabilization).
+Last activity: 2026-04-14 — Phase 12 TDDD implementation complete, all tests passing
 
 Progress: [██████████] 100%
 
-## Recent Completion: Phase 11
+## Recent Completion: Phase 12
 
-**Phase 11 — Streamlit UI Async Pattern Migration (MANUAL TESTING COMPLETE)**
+**Phase 12 — Recipe UI Improvements + CRUD Operations (COMPLETE ✅)**
 
 Deliverables:
-- 5 asyncio.run migrations across streamlit_ui pages (health_check, recipes, models, components, experiments)
-- master/neo4j async driver integration
-- docker-compose.yml infrastructure updates
-- Resource cleanup callbacks + security hardening (SQL injection prevention, exception handling)
+- RecipeManager with 8 CRUD async methods (create, read, update, delete, search, list)
+- Unique name constraints (model-level Pydantic + database-level Neo4j)
+- Streamlit UI enhancements: minimal sidebar, expandable entries, edit/delete modals
+- All 11 Recipe CRUD tests + 22 full suite tests (33/33 passing)
+- Neo4j async operations re-validated
 
-Status: Manually tested and verified. No automated test suite yet (deferred from Phase 9).
+Test Coverage: 33/33 (100%) — Waves 1-3 all passing
+- Wave 1: Model & Backend (11/11 TDDD tests)
+- Wave 2: Streamlit UI (full redesign with safeguards)
+- Wave 3: Full integration (33/33 end-to-end)
 
-See: .planning/phases/11-streamlit-ui/11-SUMMARY.md
+Status: Production-ready. Recipe management system operational.
+
+See: .planning/phases/12/SUMMARY.md
 
 **Deferred:** Phase 9 E2E test suite (conftest fixtures, daemon lifecycle tests, merge strategy tests) — designed but not executed. Remains valid design; implementation deferred pending further prioritization.
 

@@ -175,7 +175,7 @@ def run() -> None:
         st.subheader("Delete Model")
         try:
             models = asyncio.run(list_models_async())
-            model_names = {m["model_name"]: m["id"] for m in models}
+            model_names = {m['model_name']: m['id'] for m in models}
 
             selected_name = st.selectbox("Select Model to Delete", list(model_names.keys()), key="delete")
 

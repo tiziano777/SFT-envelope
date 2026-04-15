@@ -103,6 +103,16 @@ class AsyncNeo4jClient:
         finally:
             await driver.close()
 
+    async def query(self, query: str, params: dict | None = None) -> list[dict]:
+        """Compatibility wrapper used by higher-level managers.
+
+        Keeps the older `db.query(...)` semantics expected elsewhere in the
+        codebase by delegating to `run_list`. Returns an empty list when no
+        records are found.
+        """
+        params = params or {}
+        return await self.run_list(query, **params)
+
     async def count_relationships(self, node_id: str, label: str) -> int:
         """Count incoming relationships to a node.
 

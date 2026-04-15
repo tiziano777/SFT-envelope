@@ -111,9 +111,6 @@ def run() -> None:
 
             if recipes:
                 for recipe in recipes:
-                    # Use a stable unique suffix for widget keys. Prefer DB id when available,
-                    # otherwise fall back to recipe name. This avoids DuplicateWidgetID errors
-                    # when multiple recipes share the same name.
                     key_suffix = recipe.get("id") if recipe.get("id") is not None else recipe.get("name")
                     with st.expander(f"📋 {recipe.get('name', 'N/A')}", expanded=False):
                         col1, col2 = st.columns([3, 1])
@@ -123,15 +120,12 @@ def run() -> None:
                             st.caption(f"Created: {recipe.get('created_at', 'N/A')}")
 
                         with col2:
-                            # Edit button
                             if st.button("✏️ Edit", key=f"edit_{key_suffix}"):
                                 st.session_state[f"edit_recipe_{key_suffix}"] = True
 
-                            # Delete button
                             if st.button("🗑️ Delete", key=f"delete_{key_suffix}"):
                                 st.session_state[f"confirm_delete_{key_suffix}"] = True
 
-                        # Edit modal
                         if st.session_state.get(f"edit_recipe_{key_suffix}", False):
                             st.divider()
                             st.subheader("Edit Recipe")
@@ -156,7 +150,6 @@ def run() -> None:
                                     st.session_state[f"edit_recipe_{key_suffix}"] = False
                                     st.rerun()
 
-                        # Delete confirmation
                         if st.session_state.get(f"confirm_delete_{key_suffix}", False):
                             st.divider()
                             st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name')}'?")
