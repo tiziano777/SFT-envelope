@@ -37,20 +37,20 @@ async def list_recipes_async(limit: int = 20) -> list[dict]:
     return await manager.list_recipes(limit=limit)
 
 
-async def update_recipe_async(recipe_id: str, description: str = "", tags: list[str] | None = None) -> dict:
+async def update_recipe_async(recipe_name: str, description: str = "") -> dict:
     """Update recipe asynchronously."""
     db_client = get_neo4j_client()
     api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
-    return await manager.update_recipe(recipe_id, description=description, tags=tags)
+    return await manager.update(name=recipe_name, description=description)
 
 
-async def delete_recipe_async(recipe_id: str) -> None:
+async def delete_recipe_async(recipe_name: str) -> None:
     """Delete recipe asynchronously."""
     db_client = get_neo4j_client()
     api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
-    await manager.delete_recipe(recipe_id)
+    await manager.delete(name=recipe_name)
 
 
 def run() -> None:
@@ -158,7 +158,7 @@ def run() -> None:
                                 if st.button("Save Changes", key=f"save_edit_{key_suffix}"):
                                     try:
                                         result = asyncio.run(update_recipe_async(
-                                            recipe.get('id'),
+                                            recipe_name=recipe.get('name'),
                                             description=new_desc
                                         ))
                                         st.success(f"✓ Recipe updated!")
@@ -180,7 +180,7 @@ def run() -> None:
                             with col_confirm:
                                 if st.button("Yes, delete", key=f"confirm_delete_yes_{key_suffix}", type="primary"):
                                     try:
-                                        asyncio.run(delete_recipe_async(recipe.get('id')))
+                                        asyncio.run(delete_recipe_async(recipe_name=recipe.get('name')))
                                         st.success(f"✓ Recipe '{recipe.get('name')}' deleted!")
                                         st.session_state[f"confirm_delete_{key_suffix}"] = False
                                         st.rerun()

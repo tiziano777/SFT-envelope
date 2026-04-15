@@ -123,9 +123,14 @@ class RecipeManager:
                 raise UIError("YAML must contain a dictionary")
 
             config = RecipeConfig(**data)
+            # Convert Pydantic RecipeEntry models to plain dicts for Neo4j storage
+            entries_dict = {
+                path: entry.model_dump(mode="json", exclude_none=True)
+                for path, entry in config.entries.items()
+            }
             return await self.create(
                 name=name or config.name or "untitled",
-                entries=config.entries,  # Use validated entries from RecipeConfig, not raw data
+                entries=entries_dict,  # Plain dict, not Pydantic models
                 description=data.get("description", "")
             )
         except ValueError as e:
@@ -287,4 +292,3 @@ class RecipeManager:
         except Exception as e:
             logger.error(f"Failed to search recipes: {e}")
             raise UIError(f"Failed to search recipes: {str(e)}")
-
