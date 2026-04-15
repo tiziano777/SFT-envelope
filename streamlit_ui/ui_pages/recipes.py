@@ -119,6 +119,28 @@ def run() -> None:
                             st.write(f"**Description:** {recipe.get('description', 'N/A')}")
                             st.caption(f"Created: {recipe.get('created_at', 'N/A')}")
 
+                            # Display recipe entries
+                            entries = recipe.get("entries")
+                            if entries and isinstance(entries, dict):
+                                st.divider()
+                                st.subheader("📊 Dataset Entries")
+                                for dist_uri, entry in entries.items():
+                                    if isinstance(entry, dict):
+                                        cols = st.columns([2, 1, 1, 1, 1])
+                                        with cols[0]:
+                                            st.caption(f"📁 {entry.get('dist_id', 'N/A')}")
+                                        with cols[1]:
+                                            st.caption(f"📈 {entry.get('samples', 'N/A')}")
+                                        with cols[2]:
+                                            st.caption(f"🔤 {entry.get('tokens', 'N/A')}")
+                                        with cols[3]:
+                                            st.caption(f"📝 {entry.get('words', 'N/A')}")
+                                        with cols[4]:
+                                            st.caption(f"✅ {entry.get('dist_name', 'N/A')[:15]}")
+                                        st.caption(f"URI: `{dist_uri}`")
+                            else:
+                                st.info("No entries in this recipe")
+
                         with col2:
                             if st.button("✏️ Edit", key=f"edit_{key_suffix}"):
                                 st.session_state[f"edit_recipe_{key_suffix}"] = True

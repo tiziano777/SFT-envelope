@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-14
 **Status:** PLANNED
-**Mode:** TDDD (Test-Driven Development)
+**Mode:** TDD (Test-Driven Development)
 
 ## Objective
 

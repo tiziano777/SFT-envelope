@@ -4,6 +4,9 @@
 CREATE CONSTRAINT unique_recipe_id IF NOT EXISTS
 FOR (r:Recipe) REQUIRE r.recipe_id IS UNIQUE;
 
+CREATE CONSTRAINT unique_recipe_name IF NOT EXISTS
+FOR (r:Recipe) REQUIRE r.name IS UNIQUE;
+
 CREATE CONSTRAINT unique_exp_id IF NOT EXISTS
 FOR (e:Experiment) REQUIRE e.exp_id IS UNIQUE;
 

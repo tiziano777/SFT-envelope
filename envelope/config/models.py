@@ -477,8 +477,10 @@ class RecipeConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_name_not_empty_if_provided(self) -> RecipeConfig:
-        """Validate that name is not empty if provided."""
+    def validate_recipe_name(self) -> RecipeConfig:
+        """Validate that name is not empty if provided and follows naming rules."""
         if self.name is not None and not self.name.strip():
             raise ValueError("Recipe name cannot be empty or whitespace")
+        # Note: Uniqueness is enforced at DB layer (Neo4j constraint).
+        # This validator ensures name is valid before DB checks.
         return self

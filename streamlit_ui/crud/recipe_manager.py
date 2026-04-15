@@ -75,7 +75,10 @@ class RecipeManager:
         # Check uniqueness
         existing = await self.get_by_name(name)
         if existing:
-            raise UIError(f"Recipe '{name}' already exists")
+            raise UIError(
+                user_message=f"⚠️ Recipe name already exists: '{name}'",
+                details="Change the recipe name or rename the YAML file before uploading."
+            )
 
         try:
             query = """
@@ -122,7 +125,7 @@ class RecipeManager:
             config = RecipeConfig(**data)
             return await self.create(
                 name=name or config.name or "untitled",
-                entries=data,
+                entries=config.entries,  # Use validated entries from RecipeConfig, not raw data
                 description=data.get("description", "")
             )
         except ValueError as e:
