@@ -198,3 +198,129 @@ async def test_list_recipes(mock_db_client, mock_api_client):
 
     result = await manager.list_all()
     assert result == recipes
+
+
+@pytest.mark.asyncio
+async def test_create_recipe_with_entries(mock_db_client, mock_api_client):
+    """Test creating recipe properly saves entries from RecipeConfig."""
+    from envelope.config.models import RecipeConfig, RecipeEntry
+    
+    manager = RecipeManager(mock_db_client, mock_api_client)
+    
+    # Setup: RecipeConfig with entries
+    entries_dict = {
+        "/dataset/path1": {
+            "chat_type": "simple",
+            "dist_id": "dist_001",
+            "dist_name": "Dataset 1",
+            "dist_uri": "/mnt/data/dataset1.jsonl",
+            "samples": 1000,
+            "tokens": 500000,
+            "words": 100000,
+            "replica": 1
+        }
+    }
+    
+    # Mock: unique check passes, create returns recipe with entries
+    mock_db_client.query.side_effect = [
+        None,  # get_by_name returns None (unique)
+        [{"name": "test_recipe", "entries": entries_dict}]  # create returns recipe
+    ]
+    
+    result = await manager.create(
+        name="test_recipe",
+        entries=entries_dict,
+        description="Test recipe"
+    )
+    
+    # Verify entries are in result
+    assert result["entries"] == entries_dict
+    assert result["name"] == "test_recipe"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_recipe_name_error_message(mock_db_client, mock_api_client):
+    """Test duplicate recipe name raises UIError with user-friendly message."""
+    manager = RecipeManager(mock_db_client, mock_api_client)
+    
+    # Mock: get_by_name returns existing recipe
+    mock_db_client.query.return_value = [{"name": "existing_recipe"}]
+    
+    with pytest.raises(UIError) as exc_info:
+        await manager.create(
+            name="existing_recipe",
+            entries={},
+            description=""
+        )
+    
+    # Verify user-friendly error message
+    error = exc_info.value
+    assert "already exists" in error.user_message.lower()
+    assert "existing_recipe" in error.user_message
+    assert "⚠️" in error.user_message
+
+
+@pytest.mark.asyncio
+async def test_list_recipes_includes_entries(mock_db_client, mock_api_client):
+    """Test listing recipes includes entries field."""
+    manager = RecipeManager(mock_db_client, mock_api_client)
+    
+    entries = {
+        "/path1": {
+            "dist_id": "dist_001",
+            "samples": 1000,
+            "tokens": 500000,
+            "words": 100000
+        }
+    }
+    
+    recipes = [
+        {
+            "name": "recipe1",
+            "description": "Test",
+            "entries": entries,
+            "created_at": "2026-04-14",
+            "id": "recipe_1"
+        }
+    ]
+    
+    mock_db_client.query.return_value = recipes
+    
+    result = await manager.list_recipes(limit=20)
+    
+    # Verify entries are included
+    assert len(result) == 1
+    assert result[0]["entries"] == entries
+    assert result[0]["id"] == "recipe_1"
+
+
+@pytest.mark.asyncio
+async def test_search_recipes_includes_entries(mock_db_client, mock_api_client):
+    """Test searching recipes includes entries field."""
+    manager = RecipeManager(mock_db_client, mock_api_client)
+    
+    entries = {
+        "/path1": {
+            "dist_id": "dist_001",
+            "samples": 500,
+            "tokens": 250000,
+            "words": 50000
+        }
+    }
+    
+    recipes = [
+        {
+            "name": "search_result",
+            "entries": entries,
+            "created_at": "2026-04-14",
+            "id": "recipe_2"
+        }
+    ]
+    
+    mock_db_client.query.return_value = recipes
+    
+    result = await manager.search_recipes("search")
+    
+    # Verify entries are included in search results
+    assert len(result) == 1
+    assert result[0]["entries"] == entries
