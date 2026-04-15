@@ -30,6 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Datamix** - Multi-source config, DatamixLoader, replica oversampling, backward compatibility
 - [ ] **Phase 9: Testing** - E2E suite with simulate_worker/master, handshake/checkpoint/config/daemon tests
 - [ ] **Phase 10: Documentation** - Update workflow.md, README, existing docs, and new lineage docs
+- [ ] **Phase 13: Recipe Management Fix** - Filename-based recipe names, Neo4j DDL constraints, comprehensive logging, error recovery
 
 ## Phase Details
 
@@ -184,6 +185,23 @@ Plans:
 
 Plans:
 - [ ] 10-01-PLAN.md — Documentation updates: workflow.md, README, module docs, lineage guides
+
+### Phase 13: Recipe Management Fix
+**Goal**: Recipe upload workflow supports filename-based recipe names, enforces Neo4j uniqueness at DDL level, provides comprehensive error handling and logging
+**Depends on**: Phase 11 (Streamlit UI async pattern)
+**Requirements**: RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-05, RECIPE-06
+**Success Criteria** (what must be TRUE):
+  1. Recipe name is derived from YAML filename when 'name' field is not present; if both missing, raise clear validation error
+  2. Neo4j unique constraint on Recipe.name is created via DDL during build phase (not runtime in asyncClient)
+  3. Duplicate recipe name detection catches both app-level and DB-level constraint violations; user sees recovery options (rename or undo)
+  4. RecipeManager.create_recipe() validates recipe structure and confirms all entries loaded into recipe.entries
+  5. Comprehensive logging added to all CRUD operations (create, read, update, delete) with structured log messages
+  6. User sees informative error messages: "Recipe name already exists → rename or choose different file" with clear recovery path
+**Plans**: 2 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Filename-based names, Neo4j DDL constraint creation, validation error handling
+- [ ] 13-02-PLAN.md — Logging infrastructure, error messages, user recovery flows, E2E test coverage
 
 ## Progress
 
