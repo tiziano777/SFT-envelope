@@ -29,51 +29,34 @@ class RecipeManager:
         self.db = db_client
         self.api = api_client
 
-    def _extract_recipe_name(
-        self,
-        name_param: str | None,
-        filename: str | None,
-        config: RecipeConfig
-    ) -> str:
-        """Extract final recipe name from multiple sources with priority logic.
+    def _extract_name_from_filename(self, filename: str) -> str:
+        """Extract recipe name from filename (only source of truth for naming).
 
-        Priority: name_param (explicit) > config.name (from YAML) > filename (extracted)
+        Removes file extension and returns the stem.
+        Examples: "my_recipe.yaml" → "my_recipe", "recipe.yaml.bak" → "recipe.yaml"
 
         Args:
-            name_param: Explicitly provided name parameter.
-            filename: Source filename for fallback extraction.
-            config: RecipeConfig instance (may have name from YAML).
+            filename: Source filename.
 
         Returns:
-            Final recipe name.
+            Extracted recipe name.
 
         Raises:
-            ValueError: If name cannot be derived from any source.
+            ValueError: If extracted name is empty or invalid.
         """
-        # Priority 1: Explicit parameter
-        if name_param:
-            return name_param
+        path = Path(filename)
+        name_with_extension = path.name
+        if "." in name_with_extension:
+            extracted_name = name_with_extension.rsplit(".", 1)[0]
+        else:
+            extracted_name = name_with_extension
 
-        # Priority 2: Name from YAML
-        if config.name:
-            return config.name
+        if not extracted_name or not extracted_name.strip():
+            raise ValueError(
+                f"Invalid filename: cannot extract recipe name from '{filename}'"
+            )
 
-        # Priority 3: Extract from filename
-        if filename:
-            path = Path(filename)
-            name_with_extension = path.name
-            if "." in name_with_extension:
-                extracted_name = name_with_extension.rsplit(".", 1)[0]
-            else:
-                extracted_name = name_with_extension
-
-            if extracted_name and extracted_name.strip():
-                return extracted_name
-
-        # No name could be derived
-        raise ValueError(
-            "Recipe name required: provide 'name' field in YAML or upload file with .yaml/.yml extension"
-        )
+        return extracted_name
 
     async def get_by_name(self, name: str) -> Optional[dict]:
         """Retrieve recipe by name.
@@ -166,55 +149,56 @@ class RecipeManager:
 
     async def create_recipe(
         self,
-        name: str | None = None,
         yaml_content: str = "",
-        filename: str | None = None,
+        filename: str = "",
         description: str = ""
     ) -> dict:
-        """Create recipe from YAML content.
+        """Create recipe from YAML content with deterministic name from filename.
 
-        Supports two YAML formats:
-        1. Wrapped format: {name: "recipe_name", entries: {path: {...}}}
-        2. Entries-only format (auto-wrapped): {path1: {...}, path2: {...}}
+        Recipe name is extracted from filename (without extension).
+        This ensures a single, unambiguous source of truth for recipe naming.
+
+        YAML format:
+        - entries: {path1: {...}, path2: {...}}
+        - description: (optional)
 
         Args:
-            name: Optional explicit recipe name (highest priority).
-            yaml_content: YAML content string.
-            filename: Source filename for fallback name extraction.
-            description: Optional recipe description.
+            yaml_content: YAML content string containing entries and optional description.
+            filename: Source filename (required) - recipe name is extracted from this.
+            description: Optional recipe description (overrides YAML description if provided).
 
         Returns:
             Created recipe data.
 
         Raises:
+            ValueError: If filename is missing or empty.
             UIError: If YAML parsing or creation fails.
         """
+        if not filename or not filename.strip():
+            raise ValueError("Filename is required to derive recipe name")
+
         try:
             logger.debug(f"Recipe upload: filename={filename}, yaml_size={len(yaml_content)} bytes")
             data = yaml.safe_load(yaml_content)
             if not isinstance(data, dict):
                 raise UIError("YAML must contain a dictionary")
 
-            # Auto-detect format: if 'entries' key exists, assume wrapped format
-            # Otherwise, treat entire dict as entries (URI-based format)
-            if "entries" not in data:
+            # Auto-detect format: if 'entries' key exists, use it; otherwise treat entire dict as entries
+            if "entries" in data:
+                entries_data = data.get("entries", {})
+                yaml_description = data.get("description", "")
+            else:
+                # Treat entire dict as entries (URI-based format)
                 logger.debug(f"Auto-wrapping entries-only YAML format: {len(data)} entries detected")
-                # All keys except metadata fields are treated as URIs/entries
-                metadata_keys = {"name", "description"}
-                entries = {k: v for k, v in data.items() if k not in metadata_keys}
-                data = {
-                    "name": data.get("name"),
-                    "entries": entries if entries else data,  # Use extracted entries, or all data if no metadata found
-                    "description": data.get("description", "")
-                }
-                logger.debug(f"Wrapped format: {len(data['entries'])} entries")
+                entries_data = data
+                yaml_description = ""
 
-            config = RecipeConfig(**data)
-            logger.info(f"Recipe YAML parsed: name={config.name or 'derived'}, entries={len(config.entries)}")
+            # Create minimal RecipeConfig with only entries (name is optional at this stage)
+            config = RecipeConfig(name=None, entries=entries_data)
+            logger.info(f"Recipe YAML parsed: entries={len(config.entries)}")
 
-            # Call ensure_name() if filename provided to set name if still None
-            if filename:
-                config.ensure_name(filename)
+            # Extract name from filename (only source of truth)
+            recipe_name = self._extract_name_from_filename(filename)
 
             # Convert Pydantic RecipeEntry models to plain dicts for Neo4j storage
             entries_dict = {
@@ -222,25 +206,20 @@ class RecipeManager:
                 for path, entry in config.entries.items()
             }
 
-            # Extract final name with priority: name_param > config.name > filename
-            final_name = self._extract_recipe_name(
-                name_param=name,
-                filename=filename,
-                config=config
-            )
+            # Use provided description or fall back to YAML description
+            final_description = description if description else yaml_description
 
-            logger.info(f"Creating recipe: name={final_name}, entry_count={len(entries_dict)}")
+            logger.info(f"Creating recipe: name={recipe_name}, entry_count={len(entries_dict)}")
             result = await self.create(
-                name=final_name,
-                entries=entries_dict,  # Plain dict, not Pydantic models
-                description=description or data.get("description", "")
+                name=recipe_name,
+                entries=entries_dict,
+                description=final_description
             )
             logger.info(f"Recipe created successfully: name={result['name']}, entry_count={len(entries_dict)}")
             return result
         except ValueError as e:
-            raise UIError(f"YAML parsing error: {str(e)}")
+            raise UIError(f"Invalid filename or YAML: {str(e)}")
         except (UIError, DuplicateRecipeError) as e:
-            # Let UIError and DuplicateRecipeError pass through
             raise
         except Exception as e:
             logger.error(f"Recipe creation failed: {str(e)}", exc_info=True)

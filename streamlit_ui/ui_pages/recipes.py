@@ -13,12 +13,15 @@ from streamlit_ui.validation import validate_recipe_yaml
 
 
 # Async helper functions for recipe operations
-async def create_recipe_async(name: str, yaml_content: str, description: str = "", filename: str | None = None) -> dict:
-    """Create recipe asynchronously."""
+async def create_recipe_async(yaml_content: str, filename: str, description: str = "") -> dict:
+    """Create recipe asynchronously.
+
+    Recipe name is derived from filename automatically (e.g., 'my_recipe.yaml' → 'my_recipe').
+    """
     db_client = get_neo4j_client()
     api_client = get_api_client()
     manager = RecipeManager(db_client, api_client)
-    return await manager.create_recipe(name=name, yaml_content=yaml_content, description=description, filename=filename)
+    return await manager.create_recipe(yaml_content=yaml_content, filename=filename, description=description)
 
 
 async def search_recipes_async(query: str) -> list[dict]:
@@ -76,21 +79,18 @@ def run() -> None:
                     st.success("✓ Recipe validation passed")
                     # Display entry count on successful validation
                     entries_count = len(config.entries) if hasattr(config, 'entries') and config.entries else 0
-                    st.info(f"**Name:** {config.name or 'derived'} | **Entries:** {entries_count}")
+                    # Extract recipe name from filename
+                    recipe_name_from_file = uploaded_file.name.rsplit(".", 1)[0]
+                    st.info(f"**Name:** {recipe_name_from_file} | **Entries:** {entries_count}")
 
                     if st.button("Save Recipe", disabled=st.session_state.get("saving_recipe", False)):
                         st.session_state.saving_recipe = True
 
-                        # Check if user selected alternative name from recovery
-                        override_name = st.session_state.pop("override_recipe_name", None)
-                        final_name = override_name or getattr(config, "name", uploaded_file.name.rsplit(".", 1)[0])
-
                         try:
                             result = asyncio.run(
                                 create_recipe_async(
-                                    name=final_name,
                                     yaml_content=yaml_content,
-                                    filename=uploaded_file.name if not override_name else None
+                                    filename=uploaded_file.name
                                 )
                             )
                             # Entry count confirmation
@@ -99,28 +99,9 @@ def run() -> None:
                             st.toast("Recipe saved!", icon="✅")
 
                         except DuplicateRecipeError as e:
-                            # Duplicate name detected - show recovery options
                             st.error(f"Error: {e.user_message}")
                             st.caption(e.details)
-
-                            # Recovery option 1: Show suggested alternatives
-                            if e.recovery_suggestions:
-                                st.subheader("💡 Recovery Options")
-                                st.write("**Option A: Use a suggested alternative name**")
-                                for i, alt_name in enumerate(e.recovery_suggestions, 1):
-                                    if st.button(f"Use '{alt_name}'", key=f"alt_name_{i}"):
-                                        st.session_state[f"override_recipe_name"] = alt_name
-                                        st.info(f"Recipe name changed to '{alt_name}'. Click 'Save Recipe' again.")
-                                        st.rerun()
-
-                            # Recovery option 2: Rename uploaded file
-                            st.write("**Option B: Upload with a different filename**")
-                            st.info("Rename the YAML file (e.g., 'my_recipe_v2.yaml') and re-upload.")
-
-                            # Recovery option 3: Skip/cancel
-                            if st.button("Cancel Upload", key="cancel_duplicate_upload"):
-                                st.session_state.pop("saving_recipe", None)
-                                st.info("Upload cancelled. You can try again with a different filename.")
+                            st.info("💡 To resolve: Rename the YAML file (e.g., 'my_recipe_v2.yaml') and re-upload.")
 
                         except UIError as e:
                             st.error(f"Error: {e.user_message}")

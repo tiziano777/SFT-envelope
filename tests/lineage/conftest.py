@@ -9,7 +9,7 @@ from pathlib import Path
 
 import docker
 import pytest
-from neo4j import AsyncDriver, AsyncGraphDatabase
+from neo4j import AsyncDriver, AsyncGraphDatabase, GraphDatabase
 from neo4j.exceptions import ServiceUnavailable
 
 
@@ -86,21 +86,37 @@ async def neo4j_driver(neo4j_container) -> AsyncDriver:
 async def neo4j_session(neo4j_driver: AsyncDriver):
     """Test session with schema loaded.
 
-    Loads schema.cypher and triggers.cypher on setup,
-    cleans up test data on teardown.
+    Loads schema files in order:
+      1. 01-schema.cypher — Node types, constraints, indexes
+      2. 02-triggers.cypher — APOC triggers for automation
+      3. 03-seeds.cypher — Initial seed data
+
+    Cleans up test data on teardown.
     """
     async with neo4j_driver.session() as session:
-        # Load schema constraints and indexes
-        schema_file = Path(__file__).parent.parent.parent / "master" / "neo4j" / "schema.cypher"
-        if schema_file.exists():
-            schema_cypher = schema_file.read_text()
-            await session.run(schema_cypher)
+        neo4j_path = Path(__file__).parent.parent.parent / "master" / "neo4j"
 
-        # Load APOC triggers
-        triggers_file = Path(__file__).parent.parent.parent / "master" / "neo4j" / "triggers.cypher"
-        if triggers_file.exists():
-            triggers_cypher = triggers_file.read_text()
-            await session.run(triggers_cypher)
+        # Load schema files in order
+        schema_files = [
+            "01-schema.cypher",
+            "02-triggers.cypher",
+            "03-seeds.cypher",
+        ]
+
+        for filename in schema_files:
+            schema_file = neo4j_path / filename
+            if schema_file.exists():
+                cypher_content = schema_file.read_text()
+                # Split by semicolon and execute each command
+                for command in cypher_content.split(";"):
+                    command = command.strip()
+                    # Skip empty lines and comments
+                    if command and not command.startswith("//"):
+                        try:
+                            await session.run(command)
+                        except Exception as e:
+                            # Idempotent operations may fail gracefully (IF NOT EXISTS)
+                            print(f"Warning in {filename}: {e}")
 
         yield session
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from streamlit_ui.crud.recipe_manager import RecipeManager
-from streamlit_ui.errors import UIError
+from streamlit_ui.errors import UIError, DuplicateRecipeError
 
 
 @pytest.mark.asyncio
@@ -82,7 +82,7 @@ async def test_recipe_name_unique_db_check(mock_db_client, mock_api_client):
     mock_db_client.query.return_value = [{"name": "existing_recipe"}]
 
     # Attempt to create duplicate should fail
-    with pytest.raises(UIError, match="already exists"):
+    with pytest.raises(DuplicateRecipeError):
         await manager.create("existing_recipe", {})
 
 
@@ -204,9 +204,9 @@ async def test_list_recipes(mock_db_client, mock_api_client):
 async def test_create_recipe_with_entries(mock_db_client, mock_api_client):
     """Test creating recipe properly saves entries from RecipeConfig."""
     from envelope.config.models import RecipeConfig, RecipeEntry
-    
+
     manager = RecipeManager(mock_db_client, mock_api_client)
-    
+
     # Setup: RecipeConfig with entries
     entries_dict = {
         "/dataset/path1": {
@@ -220,19 +220,19 @@ async def test_create_recipe_with_entries(mock_db_client, mock_api_client):
             "replica": 1
         }
     }
-    
+
     # Mock: unique check passes, create returns recipe with entries
     mock_db_client.query.side_effect = [
         None,  # get_by_name returns None (unique)
         [{"name": "test_recipe", "entries": entries_dict}]  # create returns recipe
     ]
-    
+
     result = await manager.create(
         name="test_recipe",
         entries=entries_dict,
         description="Test recipe"
     )
-    
+
     # Verify entries are in result
     assert result["entries"] == entries_dict
     assert result["name"] == "test_recipe"
@@ -240,31 +240,30 @@ async def test_create_recipe_with_entries(mock_db_client, mock_api_client):
 
 @pytest.mark.asyncio
 async def test_duplicate_recipe_name_error_message(mock_db_client, mock_api_client):
-    """Test duplicate recipe name raises UIError with user-friendly message."""
+    """Test duplicate recipe name raises DuplicateRecipeError with suggestions."""
     manager = RecipeManager(mock_db_client, mock_api_client)
-    
+
     # Mock: get_by_name returns existing recipe
     mock_db_client.query.return_value = [{"name": "existing_recipe"}]
-    
-    with pytest.raises(UIError) as exc_info:
+
+    with pytest.raises(DuplicateRecipeError) as exc_info:
         await manager.create(
             name="existing_recipe",
             entries={},
             description=""
         )
-    
-    # Verify user-friendly error message
+
+    # Verify error has recovery suggestions
     error = exc_info.value
-    assert "already exists" in error.user_message.lower()
-    assert "existing_recipe" in error.user_message
-    assert "⚠️" in error.user_message
+    assert error.recovery_suggestions
+    assert len(error.recovery_suggestions) > 0
 
 
 @pytest.mark.asyncio
 async def test_list_recipes_includes_entries(mock_db_client, mock_api_client):
     """Test listing recipes includes entries field."""
     manager = RecipeManager(mock_db_client, mock_api_client)
-    
+
     entries = {
         "/path1": {
             "dist_id": "dist_001",
@@ -273,7 +272,7 @@ async def test_list_recipes_includes_entries(mock_db_client, mock_api_client):
             "words": 100000
         }
     }
-    
+
     recipes = [
         {
             "name": "recipe1",
@@ -283,11 +282,11 @@ async def test_list_recipes_includes_entries(mock_db_client, mock_api_client):
             "id": "recipe_1"
         }
     ]
-    
+
     mock_db_client.query.return_value = recipes
-    
+
     result = await manager.list_recipes(limit=20)
-    
+
     # Verify entries are included
     assert len(result) == 1
     assert result[0]["entries"] == entries
@@ -298,7 +297,7 @@ async def test_list_recipes_includes_entries(mock_db_client, mock_api_client):
 async def test_search_recipes_includes_entries(mock_db_client, mock_api_client):
     """Test searching recipes includes entries field."""
     manager = RecipeManager(mock_db_client, mock_api_client)
-    
+
     entries = {
         "/path1": {
             "dist_id": "dist_001",
@@ -307,7 +306,7 @@ async def test_search_recipes_includes_entries(mock_db_client, mock_api_client):
             "words": 50000
         }
     }
-    
+
     recipes = [
         {
             "name": "search_result",
@@ -316,7 +315,7 @@ async def test_search_recipes_includes_entries(mock_db_client, mock_api_client):
             "id": "recipe_2"
         }
     ]
-    
+
     mock_db_client.query.return_value = recipes
 
     result = await manager.search_recipes("search")
@@ -408,132 +407,33 @@ async def test_recipe_config_ensure_name_handles_edge_cases():
 
 
 @pytest.mark.asyncio
-async def test_extract_recipe_name_priority_param_over_all():
-    """Test _extract_recipe_name() prioritizes name_param over YAML and filename."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
+async def test_extract_name_from_filename():
+    """Test _extract_name_from_filename() extracts name from filename."""
     manager = RecipeManager(None, None)
 
-    config = RecipeConfig(
-        name="yaml_name",
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
+    # Normal case
+    assert manager._extract_name_from_filename("my_recipe.yaml") == "my_recipe"
 
-    # name_param should win
-    result = manager._extract_recipe_name(
-        name_param="param_name",
-        filename="filename_name.yaml",
-        config=config
-    )
-    assert result == "param_name"
+    # Edge case: multiple dots
+    assert manager._extract_name_from_filename("recipe.yaml.bak") == "recipe.yaml"
+
+    # No extension
+    assert manager._extract_name_from_filename("my_recipe") == "my_recipe"
 
 
 @pytest.mark.asyncio
-async def test_extract_recipe_name_priority_yaml_over_filename():
-    """Test _extract_recipe_name() prioritizes YAML name over filename."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
+async def test_extract_name_from_filename_invalid():
+    """Test _extract_name_from_filename() raises on invalid filename."""
     manager = RecipeManager(None, None)
 
-    config = RecipeConfig(
-        name="yaml_name",
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # YAML name should win over filename
-    result = manager._extract_recipe_name(
-        name_param=None,
-        filename="filename_name.yaml",
-        config=config
-    )
-    assert result == "yaml_name"
+    # Empty filename should raise
+    with pytest.raises(ValueError, match="Invalid filename"):
+        manager._extract_name_from_filename(".yaml")
 
 
 @pytest.mark.asyncio
-async def test_extract_recipe_name_fallback_to_filename():
-    """Test _extract_recipe_name() falls back to filename when no other source."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    manager = RecipeManager(None, None)
-
-    config = RecipeConfig(
-        name=None,
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # Should fall back to filename
-    result = manager._extract_recipe_name(
-        name_param=None,
-        filename="my_recipe.yaml",
-        config=config
-    )
-    assert result == "my_recipe"
-
-
-@pytest.mark.asyncio
-async def test_extract_recipe_name_raises_when_no_source():
-    """Test _extract_recipe_name() raises ValueError when no name source available."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    manager = RecipeManager(None, None)
-
-    config = RecipeConfig(
-        name=None,
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # Should raise ValueError
-    with pytest.raises(ValueError, match="Recipe name required"):
-        manager._extract_recipe_name(
-            name_param=None,
-            filename=None,
-            config=config
-        )
-
-
-@pytest.mark.asyncio
-async def test_create_recipe_with_filename_fallback(mock_db_client, mock_api_client):
-    """Test create_recipe() uses filename when YAML has no name."""
+async def test_create_recipe_with_filename_only(mock_db_client, mock_api_client):
+    """Test create_recipe() derives name from filename only."""
     manager = RecipeManager(mock_db_client, mock_api_client)
 
     yaml_content = """
@@ -555,7 +455,6 @@ entries:
     ]
 
     result = await manager.create_recipe(
-        name=None,
         yaml_content=yaml_content,
         filename="my_recipe.yaml"
     )
@@ -564,12 +463,11 @@ entries:
 
 
 @pytest.mark.asyncio
-async def test_create_recipe_yaml_name_takes_precedence(mock_db_client, mock_api_client):
-    """Test create_recipe() prefers YAML name over filename."""
+async def test_create_recipe_missing_filename(mock_db_client, mock_api_client):
+    """Test create_recipe() raises when filename is missing."""
     manager = RecipeManager(mock_db_client, mock_api_client)
 
     yaml_content = """
-name: yaml_name
 entries:
   /path/1:
     chat_type: simple
@@ -581,232 +479,21 @@ entries:
     words: 500
 """
 
-    # Mock: unique check passes, create returns recipe
-    mock_db_client.query.side_effect = [
-        None,  # get_by_name returns None (unique)
-        [{"name": "yaml_name", "entries": {}}]  # create returns recipe
-    ]
-
-    result = await manager.create_recipe(
-        name=None,
-        yaml_content=yaml_content,
-        filename="filename_name.yaml"
-    )
-
-    assert result["name"] == "yaml_name"
-
-
-@pytest.mark.asyncio
-async def test_recipe_config_ensure_name_from_filename():
-    """Test RecipeConfig.ensure_name() extracts name from filename."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    config = RecipeConfig(
-        name=None,
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # Initially None
-    assert config.name is None
-
-    # Extract from "my_recipe.yaml" → "my_recipe"
-    config.ensure_name("my_recipe.yaml")
-    assert config.name == "my_recipe"
-
-
-@pytest.mark.asyncio
-async def test_recipe_config_ensure_name_preserves_existing():
-    """Test RecipeConfig.ensure_name() doesn't override existing name."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    config = RecipeConfig(
-        name="existing_name",
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # Has existing name
-    assert config.name == "existing_name"
-
-    # ensure_name() should not override
-    config.ensure_name("new_recipe.yaml")
-    assert config.name == "existing_name"
-
-
-@pytest.mark.asyncio
-async def test_recipe_config_ensure_name_handles_edge_cases():
-    """Test RecipeConfig.ensure_name() handles edge cases like .yaml.bak."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    config = RecipeConfig(
-        name=None,
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # "recipe.yaml.bak" should extract "recipe.yaml"
-    config.ensure_name("recipe.yaml.bak")
-    assert config.name == "recipe.yaml"
-
-
-@pytest.mark.asyncio
-async def test_extract_recipe_name_priority_param_over_all():
-    """Test _extract_recipe_name() prioritizes name_param over YAML and filename."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    manager = RecipeManager(None, None)
-
-    config = RecipeConfig(
-        name="yaml_name",
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # name_param should win
-    result = manager._extract_recipe_name(
-        name_param="param_name",
-        filename="filename_name.yaml",
-        config=config
-    )
-    assert result == "param_name"
-
-
-@pytest.mark.asyncio
-async def test_extract_recipe_name_priority_yaml_over_filename():
-    """Test _extract_recipe_name() prioritizes YAML name over filename."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    manager = RecipeManager(None, None)
-
-    config = RecipeConfig(
-        name="yaml_name",
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # YAML name should win over filename
-    result = manager._extract_recipe_name(
-        name_param=None,
-        filename="filename_name.yaml",
-        config=config
-    )
-    assert result == "yaml_name"
-
-
-@pytest.mark.asyncio
-async def test_extract_recipe_name_fallback_to_filename():
-    """Test _extract_recipe_name() falls back to filename when no other source."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    manager = RecipeManager(None, None)
-
-    config = RecipeConfig(
-        name=None,
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # Should fall back to filename
-    result = manager._extract_recipe_name(
-        name_param=None,
-        filename="my_recipe.yaml",
-        config=config
-    )
-    assert result == "my_recipe"
-
-
-@pytest.mark.asyncio
-async def test_extract_recipe_name_raises_when_no_source():
-    """Test _extract_recipe_name() raises ValueError when no name source available."""
-    from envelope.config.models import RecipeConfig, RecipeEntry
-
-    manager = RecipeManager(None, None)
-
-    config = RecipeConfig(
-        name=None,
-        entries={
-            "/path/1": RecipeEntry(
-                chat_type="simple",
-                dist_id="id1",
-                dist_name="dist1",
-                dist_uri="/path/1",
-                samples=100,
-                tokens=1000,
-                words=500
-            )
-        }
-    )
-
-    # Should raise ValueError
-    with pytest.raises(ValueError, match="Recipe name required"):
-        manager._extract_recipe_name(
-            name_param=None,
-            filename=None,
-            config=config
+    with pytest.raises(ValueError, match="Filename is required"):
+        await manager.create_recipe(
+            yaml_content=yaml_content,
+            filename=""
         )
 
 
 @pytest.mark.asyncio
-async def test_create_recipe_with_filename_fallback(mock_db_client, mock_api_client):
-    """Test create_recipe() uses filename when YAML has no name."""
+async def test_create_recipe_filename_only_source(mock_db_client, mock_api_client):
+    """Test create_recipe() ignores name field in YAML, uses filename only."""
     manager = RecipeManager(mock_db_client, mock_api_client)
 
+    # YAML has 'name' but it should be ignored
     yaml_content = """
+name: ignored_name
 entries:
   /path/1:
     chat_type: simple
@@ -821,46 +508,13 @@ entries:
     # Mock: unique check passes, create returns recipe
     mock_db_client.query.side_effect = [
         None,  # get_by_name returns None (unique)
-        [{"name": "my_recipe", "entries": {}}]  # create returns recipe
+        [{"name": "actual_filename", "entries": {}}]  # create returns recipe with filename-derived name
     ]
 
     result = await manager.create_recipe(
-        name=None,
         yaml_content=yaml_content,
-        filename="my_recipe.yaml"
+        filename="actual_filename.yaml"
     )
 
-    assert result["name"] == "my_recipe"
-
-
-@pytest.mark.asyncio
-async def test_create_recipe_yaml_name_takes_precedence(mock_db_client, mock_api_client):
-    """Test create_recipe() prefers YAML name over filename."""
-    manager = RecipeManager(mock_db_client, mock_api_client)
-
-    yaml_content = """
-name: yaml_name
-entries:
-  /path/1:
-    chat_type: simple
-    dist_id: id1
-    dist_name: dist1
-    dist_uri: /path/1
-    samples: 100
-    tokens: 1000
-    words: 500
-"""
-
-    # Mock: unique check passes, create returns recipe
-    mock_db_client.query.side_effect = [
-        None,  # get_by_name returns None (unique)
-        [{"name": "yaml_name", "entries": {}}]  # create returns recipe
-    ]
-
-    result = await manager.create_recipe(
-        name=None,
-        yaml_content=yaml_content,
-        filename="filename_name.yaml"
-    )
-
-    assert result["name"] == "yaml_name"
+    # Result should use filename, not YAML name
+    assert result["name"] == "actual_filename"

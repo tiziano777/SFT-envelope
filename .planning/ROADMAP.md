@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 9: Testing** - E2E suite with simulate_worker/master, handshake/checkpoint/config/daemon tests
 - [ ] **Phase 10: Documentation** - Update workflow.md, README, existing docs, and new lineage docs
 - [x] **Phase 13: Recipe Management Fix** - Filename-based recipe names, Neo4j DDL constraints, comprehensive logging, error recovery
-- [ ] **Phase 13.1: Neo4j Schema Consolidation** (INSERTED) - Eliminate database/schema_init.cypher redundancy, create complete schema (nodes/edges/constraints/triggers from Pydantic models), populate seed data (Component Nodes and Models)
+- [x] **Phase 13.1: Neo4j Schema Consolidation** (INSERTED) - Eliminate database/schema_init.cypher redundancy, create complete schema (nodes/edges/constraints/triggers from Pydantic models), populate seed data (Component Nodes and Models)
 
 ## Phase Details
 
@@ -238,4 +238,4 @@ Phases execute respecting dependency waves. Within a wave, phases can execute in
 | 9. Testing | 2/2 | Created | 2026-04-13 |
 | 10. Documentation | 0/1 | Not started | - |
 | 13. Recipe Management Fix | 2/2 | Complete | 2026-04-15 |
-| 13.1. Neo4j Schema Consolidation | 0/1 | Not started | - |
+| 13.1. Neo4j Schema Consolidation | 1/1 | Complete | 2026-04-15 |

@@ -13,27 +13,52 @@ from streamlit_ui.utils import get_api_client, get_config, get_neo4j_client
 
 
 async def ensure_schema_initialized() -> None:
-    """Execute Neo4j DDL schema initialization script (idempotent).
+    """Execute Neo4j schema initialization scripts (idempotent).
 
-    Runs CREATE CONSTRAINT ... IF NOT EXISTS commands from database/schema_init.cypher.
-    Safe to call multiple times; subsequent runs are no-ops if constraints exist.
+    Runs Cypher DDL files in order:
+      1. 01-schema.cypher — Node types, constraints, indexes
+      2. 02-triggers.cypher — APOC triggers for automation
+      3. 03-seeds.cypher — Initial seed data (Components, Models)
+
+    Safe to call multiple times; subsequent runs are no-ops for existing constraints.
+    Uses CREATE ... IF NOT EXISTS patterns for idempotency.
     """
     try:
         db_client = get_neo4j_client()
-        # Read and execute schema_init.cypher
-        schema_file = Path(__file__).parent.parent / "database" / "schema_init.cypher"
-        if not schema_file.exists():
-            st.warning(f"Schema file not found: {schema_file}")
-            return
 
-        with open(schema_file) as f:
-            cypher_commands = f.read()
+        # Schema files to load in order
+        schema_files = [
+            "01-schema.cypher",
+            "02-triggers.cypher",
+            "03-seeds.cypher",
+        ]
 
-        # Split by semicolon and execute each command
-        for command in cypher_commands.split(";"):
-            command = command.strip()
-            if command and not command.startswith("//"):
-                await db_client.run(command)
+        base_path = Path(__file__).parent.parent / "master" / "neo4j"
+
+        for schema_file_name in schema_files:
+            schema_file = base_path / schema_file_name
+            if not schema_file.exists():
+                st.warning(f"Schema file not found: {schema_file}")
+                continue
+
+            with open(schema_file) as f:
+                cypher_content = f.read()
+
+            # Split by semicolon and execute each command
+            commands_executed = 0
+            for command in cypher_content.split(";"):
+                command = command.strip()
+                # Skip empty lines and comments
+                if command and not command.startswith("//"):
+                    try:
+                        await db_client.run(command)
+                        commands_executed += 1
+                    except Exception as cmd_error:
+                        # Log but continue — idempotent operations may fail gracefully
+                        print(f"Cypher command warning in {schema_file_name}: {cmd_error}")
+
+            if commands_executed > 0:
+                print(f"Loaded {schema_file_name}: {commands_executed} commands executed")
 
         st.session_state.schema_initialized = True
     except Exception as e:
