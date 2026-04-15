@@ -156,11 +156,18 @@ class AsyncNeo4jClient:
         return None
 
     async def ensure_recipe_constraints(self) -> None:
-        """Ensure Recipe node uniqueness constraint exists.
+        """DEPRECATED: Use DDL schema_init.cypher instead.
 
-        Creates a unique constraint on Recipe.name if it doesn't already exist.
-        This enforces uniqueness at the DB level, preventing duplicate recipe names.
+        This runtime method is kept for backward compatibility.
+        All constraint creation should be done via DDL during app initialization.
         """
+        import warnings
+        warnings.warn(
+            "ensure_recipe_constraints() is deprecated. Use schema_init.cypher DDL.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
         try:
             # Create unique constraint if it doesn't exist (idempotent in Neo4j 4.4+)
             query = "CREATE CONSTRAINT unique_recipe_name IF NOT EXISTS FOR (r:Recipe) REQUIRE r.name IS UNIQUE"
