@@ -78,3 +78,31 @@ class DeleteProtectionError(UIError):
         self.dependency_count = dependency_count
         self.dependency_type = dependency_type
         super().__init__(user_msg)
+
+
+class DuplicateRecipeError(UIError):
+    """Recipe with this name already exists.
+
+    Provides user message, details, and suggested recovery options.
+    """
+
+    def __init__(self, recipe_name: str, recovery_suggestions: list[str] | None = None):
+        """Initialize DuplicateRecipeError.
+
+        Args:
+            recipe_name: Name of recipe that already exists.
+            recovery_suggestions: List of alternative names to try (optional).
+        """
+        self.recipe_name = recipe_name
+        self.recovery_suggestions = recovery_suggestions or []
+
+        suggestions_text = ""
+        if self.recovery_suggestions:
+            suggestions_text = "\n\nSuggested alternatives:\n"
+            for i, alt in enumerate(self.recovery_suggestions[:3], 1):  # Show top 3
+                suggestions_text += f"  {i}. {alt}\n"
+
+        super().__init__(
+            user_message=f"⚠️ Recipe '{recipe_name}' already exists",
+            details=f"Choose a different recipe name or upload with a different filename.{suggestions_text}"
+        )
