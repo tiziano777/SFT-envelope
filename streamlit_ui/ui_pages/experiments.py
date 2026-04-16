@@ -7,7 +7,7 @@ import logging
 
 import streamlit as st
 
-from streamlit_ui.crud.experiment_manager import ExperimentManager
+from streamlit_ui.crud.repository.experiment_repository import ExperimentRepository
 from streamlit_ui.utils.errors import UIError
 from streamlit_ui.utils import get_neo4j_client
 
@@ -18,22 +18,22 @@ logger = logging.getLogger(__name__)
 async def create_experiment_async(model_id: str, status: str, description: str) -> dict:
     """Create experiment asynchronously."""
     db_client = get_neo4j_client()
-    manager = ExperimentManager(db_client)
-    return await manager.create_experiment(model_id=model_id, status=status, description=description)
+    repo = ExperimentRepository(db_client)
+    return await repo.create_experiment(model_id=model_id, status=status, description=description)
 
 
 async def list_experiments_async(status: str | None = None) -> list[dict]:
     """List experiments asynchronously."""
     db_client = get_neo4j_client()
-    manager = ExperimentManager(db_client)
-    return await manager.list_experiments(status=status)
+    repo = ExperimentRepository(db_client)
+    return await repo.list_experiments(status=status)
 
 
 async def get_experiment_async(exp_id: str) -> dict:
     """Get experiment asynchronously."""
     db_client = get_neo4j_client()
-    manager = ExperimentManager(db_client)
-    return await manager.get_experiment(exp_id)
+    repo = ExperimentRepository(db_client)
+    return await repo.get_experiment(exp_id)
 
 
 async def update_experiment_async(
@@ -41,8 +41,8 @@ async def update_experiment_async(
 ) -> dict:
     """Update experiment asynchronously."""
     db_client = get_neo4j_client()
-    manager = ExperimentManager(db_client)
-    return await manager.update_experiment(
+    repo = ExperimentRepository(db_client)
+    return await repo.update_experiment(
         exp_id, status=status, description=description, exit_status=exit_status, exit_msg=exit_msg
     )
 
@@ -124,11 +124,7 @@ def run() -> None:
 
                 with st.form("edit_experiment_form"):
                     status = st.selectbox(
-                        "Status",
-                        ["PENDING", "RUNNING", "COMPLETED", "FAILED"],
-                        index=["PENDING", "RUNNING", "COMPLETED", "FAILED"].index(
-                            exp.get("status", "PENDING")
-                        ),
+                        "Status", ["PENDING", "RUNNING", "COMPLETED", "FAILED"], index=["PENDING", "RUNNING", "COMPLETED", "FAILED"].index(exp.get("status", "PENDING"))
                     )
                     description = st.text_area("Description", value=exp.get("description", ""))
                     submitted = st.form_submit_button("Update Experiment")
@@ -137,11 +133,7 @@ def run() -> None:
                         try:
                             asyncio.run(
                                 update_experiment_async(
-                                    exp_id,
-                                    status=status,
-                                    description=description,
-                                    exit_status=None,
-                                    exit_msg=None,
+                                    exp_id, status=status, description=description, exit_status=None, exit_msg=None
                                 )
                             )
                             st.success("✓ Experiment updated!")
