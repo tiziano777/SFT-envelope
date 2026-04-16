@@ -42,7 +42,7 @@ async def update_recipe_async(recipe_id: str, new_name: str | None = None, descr
     """Update recipe asynchronously."""
     db_client = get_neo4j_client()
     repo = RecipeRepository(db_client)
-    return await repo.update(recipe_id=recipe_id, new_name=new_name, description=description, scope=scope, tasks=tasks, tags=tags)
+    return await repo.update(recipe_id=recipe_id, new_name=new_name, description=description, scope=scope, tasks=tasks, tags=tags)  # repo.update internally maps to id
 
 
 async def delete_recipe_async(recipe_id: str) -> None:
@@ -76,15 +76,15 @@ def run() -> None:
             else:
                 yaml_content = uploaded_file.read().decode("utf-8")
                 logger.debug("Uploaded file read: name=%s size=%d", uploaded_file.name, len(yaml_content))
-                is_valid, config, errors = validate_recipe_yaml(yaml_content, filename=uploaded_file.name)
+                is_valid, config, errors = validate_recipe_yaml(yaml_content)
 
                 if is_valid:
                     st.success("✓ Recipe validation passed")
                     # Display entry count on successful validation
                     entries_count = len(config.entries) if hasattr(config, 'entries') and config.entries else 0
                     yaml_name = getattr(config, 'name', None)
-                    yaml_recipe_id = getattr(config, 'recipe_id', None)
-                    st.info(f"**Name:** {yaml_name or 'N/A'} | **Recipe ID:** {yaml_recipe_id or 'N/A'} | **Entries:** {entries_count}")
+                    yaml_id = getattr(config, 'id', None)
+                    st.info(f"**Name:** {yaml_name or 'N/A'} | **Recipe ID:** {yaml_id or 'N/A'} | **Entries:** {entries_count}")
                     logger.info("Validation passed for %s: detected_entries=%d", uploaded_file.name, entries_count)
                     try:
                         keys = list(config.entries.keys()) if hasattr(config, 'entries') and config.entries else []
@@ -140,7 +140,7 @@ def run() -> None:
             if recipes:
                 for recipe in recipes:
                     key_suffix = recipe.get("id") if recipe.get("id") is not None else recipe.get("name")
-                    display_name = recipe.get('name') or recipe.get('recipe_id')
+                    display_name = recipe.get('name') or recipe.get('id')
                     with st.expander(f"📋 {display_name} - {key_suffix}", expanded=False):
                         col1, col2 = st.columns([3, 1])
 
@@ -194,7 +194,7 @@ def run() -> None:
 
                             with col_delete:
                                 # Check if recipe can be deleted
-                                can_delete = asyncio.run(is_recipe_deletable_async(recipe.get('recipe_id') or recipe.get('name')))
+                                can_delete = asyncio.run(is_recipe_deletable_async(recipe.get('id') or recipe.get('name')))
                                 if st.button(
                                     "🗑️ Delete",
                                     key=f"delete_{key_suffix}",
@@ -270,14 +270,14 @@ def run() -> None:
 
                         if st.session_state.get(f"confirm_delete_{key_suffix}", False):
                             st.divider()
-                            st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name') or recipe.get('recipe_id')}'?")
+                            st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name') or recipe.get('id')}'?")
                             col_confirm, col_cancel = st.columns(2)
 
                             with col_confirm:
                                 if st.button("Yes, delete", key=f"confirm_delete_yes_{key_suffix}", type="primary"):
                                     try:
-                                        asyncio.run(delete_recipe_async(recipe_id=recipe.get('recipe_id') or recipe.get('name')))
-                                        st.success(f"✓ Recipe '{recipe.get('name') or recipe.get('recipe_id')}' deleted!")
+                                        asyncio.run(delete_recipe_async(recipe_id=recipe.get('id') or recipe.get('name')))
+                                        st.success(f"✓ Recipe '{recipe.get('name') or recipe.get('id')}' deleted!")
                                         st.session_state[f"confirm_delete_{key_suffix}"] = False
                                         st.rerun()
                                     except UIError as e:
