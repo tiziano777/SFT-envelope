@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from streamlit_ui.utils.validation import validate_recipe_yaml
+from streamlit_ui.utils.recipe_validation import validate_recipe_yaml
 
 
 def test_validate_yaml_valid():

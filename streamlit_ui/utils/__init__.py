@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from streamlit_ui.api_client import HTTPXClient
+from streamlit_ui.utils.api_client import HTTPXClient
 from streamlit_ui.config import Config
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 
 @st.cache_resource
