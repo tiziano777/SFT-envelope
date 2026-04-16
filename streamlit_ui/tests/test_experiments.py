@@ -1,24 +1,20 @@
-"""Tests for experiment manager."""
+"""Tests for experiment repository."""
 
 from __future__ import annotations
 
 import pytest
 
-from streamlit_ui.crud.experiment_manager import ExperimentManager
+from streamlit_ui.crud.repository.experiment_repository import ExperimentRepository
 
 
 @pytest.mark.asyncio
-async def test_experiment_manager_init(config):
-    """Test ExperimentManager initialization."""
-    from streamlit_ui.neo4j_async import AsyncNeo4jClient
-    from streamlit_ui.api_client import HTTPXClient
+async def test_experiment_repository_init(config):
+    """Test ExperimentRepository initialization."""
+    from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
     db_client = AsyncNeo4jClient("neo4j://localhost:7687", "neo4j", "password")
-    api_client = HTTPXClient("http://localhost:8000", "test-token")
-    manager = ExperimentManager(db_client, api_client)
+    repo = ExperimentRepository(db_client)
 
-    assert manager.db is not None
-    assert manager.api is not None
+    assert repo.db is not None
 
     await db_client.close()
-    await api_client.close()
