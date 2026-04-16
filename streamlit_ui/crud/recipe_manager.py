@@ -117,7 +117,7 @@ class RecipeManager:
             yaml_description = data.get("description") if "description" in data else None
             yaml_recipe_id = data.get("recipe_id")
             yaml_scope = data.get("scope")
-            yaml_tasks = data.get("tasks", [])
+            yaml_tasks = data.get("task") or data.get("tasks", [])
             yaml_tags = data.get("tags", [])
             yaml_derived_from = data.get("derived_from")
 

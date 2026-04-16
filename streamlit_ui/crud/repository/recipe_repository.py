@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import Optional
 
+import yaml
+from pydantic import ValidationError
+
+from streamlit_ui.crud.entities.recipe import Recipe
 from streamlit_ui.utils.errors import UIError, DuplicateRecipeError
 from streamlit_ui.utils.entity_constraints import EntityConstraints
 from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
@@ -89,6 +94,99 @@ class RecipeRepository:
         except Exception as e:
             logger.error(f"Failed to get recipe by recipe_id: {e}")
             raise UIError(f"Failed to retrieve recipe: {str(e)}")
+
+    async def create_from_yaml(
+        self,
+        yaml_content: str,
+        description: str = "",
+    ) -> dict:
+        """Create recipe from YAML content with full metadata extraction.
+
+        Parses YAML, validates entries, and creates recipe with all metadata
+        (scope, tasks, tags, derived_from).
+
+        Args:
+            yaml_content: YAML content string containing entries and metadata.
+            description: Optional description (overrides YAML description if provided).
+
+        Returns:
+            Created recipe data.
+
+        Raises:
+            UIError: If YAML parsing or creation fails.
+            DuplicateRecipeError: If recipe name or ID already exists.
+        """
+        try:
+            logger.debug("Recipe upload: yaml_size=%d bytes", len(yaml_content))
+            data = yaml.safe_load(yaml_content)
+            if not isinstance(data, dict):
+                raise UIError("YAML must contain a dictionary")
+
+            # Extract entries (required)
+            entries_data = data.get("entries")
+            if entries_data is None or not isinstance(entries_data, dict):
+                raise UIError("YAML must contain top-level 'entries' mapping of dataset URIs to metadata")
+
+            # Extract metadata (all optional at YAML load time)
+            yaml_name = data.get("name")
+            yaml_description = data.get("description") if "description" in data else None
+            yaml_recipe_id = data.get("recipe_id")
+            yaml_scope = data.get("scope")
+            yaml_tasks = data.get("task") or data.get("tasks", [])  # Support both singular/plural
+            yaml_tags = data.get("tags", [])
+            yaml_derived_from = data.get("derived_from")
+
+            logger.debug(f"[DEBUG] Parsed YAML: name={yaml_name} recipe_id={yaml_recipe_id} entries={len(entries_data)}")
+
+            # Create Recipe to validate entries structure
+            config = Recipe(
+                id=yaml_recipe_id,
+                name=yaml_name,
+                entries=entries_data,
+                description=yaml_description,
+                scope=yaml_scope,
+                tasks=yaml_tasks,
+                tags=yaml_tags,
+                derived_from=yaml_derived_from
+            )
+            logger.info(f"Recipe YAML parsed: name={config.name} entries={len(config.entries)}")
+
+            # Convert entries to plain dicts
+            entries_dict = {
+                path: entry.model_dump(mode="json", exclude_none=True)
+                for path, entry in config.entries.items()
+            }
+
+            # Determine recipe_id: use provided or generate new UUID
+            if yaml_recipe_id:
+                recipe_id = str(yaml_recipe_id)
+            else:
+                recipe_id = str(uuid.uuid4())
+
+            final_description = description if description is not None else yaml_description
+
+            logger.info("Creating recipe from YAML: recipe_id=%s name=%s entry_count=%d", recipe_id, config.name, len(entries_dict))
+
+            # Delegate to create() for database insertion
+            result = await self.create(
+                recipe_id=recipe_id,
+                name=config.name,
+                entries=entries_dict,
+                description=final_description,
+                scope=yaml_scope or "",
+                tasks=yaml_tasks or [],
+                tags=yaml_tags or [],
+                derived_from=yaml_derived_from,
+            )
+
+            logger.info("Recipe created from YAML: recipe_id=%s name=%s entry_count=%d", recipe_id, result.get("name"), len(entries_dict))
+            return result
+
+        except (UIError, DuplicateRecipeError, ValidationError) as e:
+            raise
+        except Exception as e:
+            logger.error(f"Recipe YAML creation failed: {str(e)}", exc_info=True)
+            raise UIError(f"Failed to create recipe: {str(e)}")
 
     async def create(
         self,
