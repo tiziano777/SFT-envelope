@@ -6,8 +6,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from streamlit_ui.errors import UIError
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.utils.errors import UIError
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class ExperimentRepository:
         })
         RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
                e.status as status, e.description as description,
-               e.created_at as created_at
+               e.created_at as created_at, e.updated_at as updated_at
         """
 
         result = await self.db.run_single(
@@ -71,6 +71,31 @@ class ExperimentRepository:
 
         logger.info(f"Experiment created: id={exp_id}, model_id={model_id}")
         return result
+
+    async def create_experiment(
+        self,
+        model_id: str,
+        status: str = "PENDING",
+        description: str = "",
+    ) -> dict:
+        """Create a new experiment (generates UUID automatically).
+
+        Args:
+            model_id: Associated Model ID.
+            status: Experiment status (PENDING, RUNNING, COMPLETED, FAILED).
+            description: Experiment description.
+
+        Returns:
+            Created experiment data.
+        """
+        import uuid
+        exp_id = str(uuid.uuid4())
+        return await self.create(
+            exp_id=exp_id,
+            model_id=model_id,
+            status=status,
+            description=description,
+        )
 
     async def get_by_id(self, exp_id: str) -> Optional[dict]:
         """Get experiment by ID.
@@ -91,6 +116,10 @@ class ExperimentRepository:
         result = await self.db.run_single(query, id=exp_id)
         return result
 
+    async def get_experiment(self, exp_id: str) -> Optional[dict]:
+        """Alias for get_by_id for manager compatibility."""
+        return await self.get_by_id(exp_id)
+
     async def list_all(self, status: Optional[str] = None) -> list[dict]:
         """List experiments optionally filtered by status.
 
@@ -105,7 +134,7 @@ class ExperimentRepository:
             MATCH (e:Experiment {status: $status})
             RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
                    e.status as status, e.description as description,
-                   e.created_at as created_at
+                   e.created_at as created_at, e.updated_at as updated_at
             LIMIT 100
             """
             results = await self.db.run_list(query, status=status)
@@ -114,12 +143,16 @@ class ExperimentRepository:
             MATCH (e:Experiment)
             RETURN e.id as id, e.exp_id as exp_id, e.model_id as model_id,
                    e.status as status, e.description as description,
-                   e.created_at as created_at
+                   e.created_at as created_at, e.updated_at as updated_at
             LIMIT 100
             """
             results = await self.db.run_list(query)
 
         return results
+
+    async def list_experiments(self, status: Optional[str] = None) -> list[dict]:
+        """Alias for list_all for manager compatibility."""
+        return await self.list_all(status=status)
 
     async def update(
         self,
@@ -199,8 +232,25 @@ class ExperimentRepository:
         logger.info(f"Experiment updated: id={exp_id}")
         return result
 
+    async def update_experiment(
+        self,
+        exp_id: str,
+        status: Optional[str] = None,
+        description: Optional[str] = None,
+        exit_status: Optional[str] = None,
+        exit_msg: Optional[str] = None,
+    ) -> dict:
+        """Alias for update for manager compatibility."""
+        return await self.update(
+            exp_id=exp_id,
+            status=status,
+            description=description,
+            exit_status=exit_status,
+            exit_msg=exit_msg,
+        )
+
     async def delete(self, exp_id: str) -> None:
-        """Delete experiment (use with caution - no dependency check here).
+        """Delete experiment with constraint checking.
 
         Args:
             exp_id: Experiment ID to delete.
@@ -215,6 +265,10 @@ class ExperimentRepository:
         except Exception as e:
             logger.error(f"Experiment deletion failed: {exp_id}", exc_info=True)
             raise UIError(f"Failed to delete experiment: {str(e)}")
+
+    async def delete_experiment(self, exp_id: str) -> None:
+        """Alias for delete for manager compatibility."""
+        await self.delete(exp_id)
 
     async def count_dependencies(self, exp_id: str) -> int:
         """Count checkpoints for this experiment.
@@ -232,3 +286,7 @@ class ExperimentRepository:
 
         result = await self.db.run_single(query, id=exp_id)
         return result["dep_count"] if result else 0
+
+    async def check_experiment_dependencies(self, exp_id: str) -> int:
+        """Alias for count_dependencies for manager compatibility."""
+        return await self.count_dependencies(exp_id)

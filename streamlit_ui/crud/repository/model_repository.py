@@ -6,8 +6,9 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from streamlit_ui.errors import UIError
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.utils.errors import UIError
+from streamlit_ui.utils.entity_constraints import EntityConstraints
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class ModelRepository:
     def __init__(self, db_client: AsyncNeo4jClient):
         """Initialize repository with Neo4j client."""
         self.db = db_client
+        self.constraints = EntityConstraints(db_client)
 
     async def create(
         self,
@@ -58,7 +60,7 @@ class ModelRepository:
         })
         RETURN m.id as id, m.model_name as model_name, m.version as version,
                m.uri as uri, m.url as url, m.doc_url as doc_url,
-               m.description as description, m.created_at as created_at
+               m.description as description, m.created_at as created_at, m.updated_at as updated_at
         """
 
         result = await self.db.run_single(
@@ -80,6 +82,40 @@ class ModelRepository:
         logger.info(f"Model created: id={model_id}, name={model_name}")
         return result
 
+    async def create_model(
+        self,
+        model_name: str,
+        version: str = "",
+        uri: str = "",
+        url: str = "",
+        doc_url: str = "",
+        description: str = "",
+    ) -> dict:
+        """Create a new model (generates UUID automatically).
+
+        Args:
+            model_name: Unique model name.
+            version: Model version.
+            uri: Model URI.
+            url: Model URL.
+            doc_url: Documentation URL.
+            description: Model description.
+
+        Returns:
+            Created model data.
+        """
+        import uuid
+        model_id = str(uuid.uuid4())
+        return await self.create(
+            model_id=model_id,
+            model_name=model_name,
+            version=version,
+            uri=uri,
+            url=url,
+            doc_url=doc_url,
+            description=description,
+        )
+
     async def get_by_id(self, model_id: str) -> Optional[dict]:
         """Get model by ID.
 
@@ -93,7 +129,7 @@ class ModelRepository:
         MATCH (m:Model {id: $id})
         RETURN m.id as id, m.model_name as model_name, m.version as version,
                m.uri as uri, m.url as url, m.doc_url as doc_url,
-               m.description as description, m.created_at as created_at
+               m.description as description, m.created_at as created_at, m.updated_at as updated_at
         """
 
         result = await self.db.run_single(query, id=model_id)
@@ -109,12 +145,69 @@ class ModelRepository:
         MATCH (m:Model)
         RETURN m.id as id, m.model_name as model_name, m.version as version,
                m.uri as uri, m.url as url, m.doc_url as doc_url,
-               m.description as description, m.created_at as created_at
+               m.description as description, m.created_at as created_at, m.updated_at as updated_at
         LIMIT 100
         """
 
         results = await self.db.run_list(query)
         return results
+
+    async def list_models(self) -> list[dict]:
+        """Alias for list_all for manager compatibility.
+
+        Returns:
+            List of model dictionaries.
+        """
+        return await self.list_all()
+
+    async def get_model(self, model_id: str) -> Optional[dict]:
+        """Alias for get_by_id for manager compatibility.
+
+        Args:
+            model_id: Model ID.
+
+        Returns:
+            Model data or None if not found.
+        """
+        return await self.get_by_id(model_id)
+
+    async def update_model(
+        self,
+        model_id: str,
+        version: str = "",
+        uri: str = "",
+        url: str = "",
+        doc_url: str = "",
+        description: str = "",
+    ) -> dict:
+        """Alias for update for manager compatibility."""
+        return await self.update(
+            model_id=model_id,
+            version=version,
+            uri=uri,
+            url=url,
+            doc_url=doc_url,
+            description=description,
+        )
+
+    async def delete_model(self, model_id: str) -> None:
+        """Alias for delete for manager compatibility.
+
+        Args:
+            model_id: Model ID to delete.
+        """
+        await self.delete(model_id)
+
+    async def check_model_dependencies(self, model_id: str) -> int:
+        """Alias for count_dependencies for manager compatibility.
+
+        Args:
+            model_id: Model ID.
+
+        Returns:
+            Number of dependent relationships.
+        """
+        return await self.count_dependencies(model_id)
 
     async def update(
         self,
@@ -168,14 +261,25 @@ class ModelRepository:
         return result
 
     async def delete(self, model_id: str) -> None:
-        """Delete model (use with caution - no dependency check here).
+        """Delete model with constraint checking.
 
         Args:
             model_id: Model ID to delete.
 
         Raises:
-            UIError: If deletion fails.
+            UIError: If model not found, has related experiments, or query fails.
         """
+        existing = await self.get_by_id(model_id)
+        if not existing:
+            raise UIError(f"Model '{model_id}' not found")
+
+        # Check if model can be deleted (no related experiments)
+        if not await self.is_deletable(model_id):
+            raise UIError(
+                f"Cannot delete model '{model_id}': it's used by one or more experiments. "
+                "Remove experiments first before deleting the model."
+            )
+
         try:
             query = "MATCH (m:Model {id: $id}) DETACH DELETE m"
             await self.db.run(query, id=model_id)
@@ -183,6 +287,30 @@ class ModelRepository:
         except Exception as e:
             logger.error(f"Model deletion failed: {model_id}", exc_info=True)
             raise UIError(f"Failed to delete model: {str(e)}")
+
+    async def is_deletable(self, model_id: str) -> bool:
+        """Check if model can be deleted (no related experiments).
+
+        Args:
+            model_id: Model ID to check.
+
+        Returns:
+            True if model has no related experiments, False otherwise.
+        """
+        existing = await self.get_by_id(model_id)
+        if not existing:
+            return True
+        # Query for experiments using this model
+        query = """
+        MATCH (m:Model {id: $id})
+        OPTIONAL MATCH (m)<-[:SELECTED_FOR]-(e:Experiment)
+        RETURN COUNT(e) as experiment_count
+        """
+        result = await self.db.run_single(query, id=model_id)
+        if result:
+            count = result.get("experiment_count", 0)
+            return count == 0
+        return True
 
     async def count_dependencies(self, model_id: str) -> int:
         """Count relationships to this model.

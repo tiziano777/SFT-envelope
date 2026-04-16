@@ -41,7 +41,7 @@ class RecipeRepository:
         try:
             query = """
             MATCH (r:Recipe {name: $name})
-            RETURN r.id as recipe_id, r.name as name, r.description as description,
+            RETURN r.id as id, r.name as name, r.description as description,
                    r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
                    r.entries as entries, r.created_at as created_at, r.updated_at as updated_at
             """
@@ -71,7 +71,7 @@ class RecipeRepository:
         try:
             query = """
             MATCH (r:Recipe {id: $id})
-            RETURN r.id as recipe_id, r.name as name, r.description as description,
+            RETURN r.id as id, r.name as name, r.description as description,
                    r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
                    r.entries as entries, r.created_at as created_at, r.updated_at as updated_at
             """
@@ -242,12 +242,12 @@ class RecipeRepository:
             logger.info(f"Updating recipe: recipe_id={recipe_id}, fields={list(updates.keys())}")
             set_clause = ", ".join([f"r.{k} = ${k}" for k in updates.keys()])
             query = f"""
-            MATCH (r:Recipe {{recipe_id: $recipe_id}})
+            MATCH (r:Recipe {{id: $id}})
             SET {set_clause}
-            RETURN r.recipe_id as recipe_id, r.name as name, r.description as description,
+            RETURN r.id as id, r.name as name, r.description as description,
                    r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from, r.entries as entries
             """
-            params = {"recipe_id": recipe_id, **updates}
+            params = {"id": recipe_id, **updates}
             result = await self.db.query(query, params)
             if result:
                 row = result[0]
@@ -256,7 +256,7 @@ class RecipeRepository:
                         row['entries'] = json.loads(row['entries'])
                     except Exception:
                         logger.exception("Failed to parse entries JSON on update")
-                logger.info(f"Recipe updated: {row.get('recipe_id')}")
+                logger.info(f"Recipe updated: {row.get('id')}")
                 return row
             raise UIError("Failed to update recipe")
         except Exception as e:
@@ -305,8 +305,8 @@ class RecipeRepository:
 
         try:
             logger.info("Deleting recipe: recipe_id=%s", recipe_id)
-            query = "MATCH (r:Recipe {recipe_id: $recipe_id}) DELETE r"
-            await self.db.query(query, {"recipe_id": recipe_id})
+            query = "MATCH (r:Recipe {id: $id}) DELETE r"
+            await self.db.query(query, {"id": recipe_id})
             logger.info("Recipe deleted: recipe_id=%s", recipe_id)
         except Exception as e:
             logger.error(f"Recipe deletion failed: {recipe_id}", exc_info=True)
@@ -325,9 +325,9 @@ class RecipeRepository:
             logger.debug("Listing all recipes")
             query = """
             MATCH (r:Recipe)
-            RETURN r.name as name, r.description as description, r.scope as scope,
+            RETURN r.id as id, r.name as name, r.description as description, r.scope as scope,
                    r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
-                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries, r.recipe_id as recipe_id
+                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries
             ORDER BY r.created_at DESC
             """
             result = await self.db.query(query)
@@ -338,8 +338,6 @@ class RecipeRepository:
                         row['entries'] = json.loads(row['entries'])
                     except Exception:
                         logger.exception("Failed to parse entries JSON in list_all")
-                if 'recipe_id' not in row and row.get('name'):
-                    row['recipe_id'] = row.get('name')
             logger.debug(f"Found {len(rows)} recipes")
             return rows
         except Exception as e:
@@ -362,9 +360,9 @@ class RecipeRepository:
             logger.debug(f"Listing recipes (limit={limit})")
             query = """
             MATCH (r:Recipe)
-            RETURN r.name as name, r.description as description, r.scope as scope,
+            RETURN r.id as id, r.name as name, r.description as description, r.scope as scope,
                    r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
-                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries, r.recipe_id as recipe_id, id(r) as id
+                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries
             ORDER BY r.created_at DESC
             LIMIT $limit
             """
@@ -376,8 +374,6 @@ class RecipeRepository:
                         row['entries'] = json.loads(row['entries'])
                     except Exception:
                         logger.exception("Failed to parse entries JSON in list_with_limit")
-                if 'recipe_id' not in row and row.get('name'):
-                    row['recipe_id'] = row.get('name')
             logger.debug(f"Found {len(rows) if rows else 0} recipes")
             return rows
         except Exception as e:
@@ -401,9 +397,9 @@ class RecipeRepository:
             cypher_query = """
             MATCH (r:Recipe)
             WHERE toLower(r.name) CONTAINS toLower($query)
-            RETURN r.name as name, r.description as description, r.scope as scope,
+            RETURN r.id as id, r.name as name, r.description as description, r.scope as scope,
                    r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
-                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries, r.recipe_id as recipe_id, id(r) as id
+                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries
             ORDER BY r.created_at DESC
             """
             result = await self.db.query(cypher_query, {"query": query_str})
@@ -414,8 +410,6 @@ class RecipeRepository:
                         row['entries'] = json.loads(row['entries'])
                     except Exception:
                         logger.exception("Failed to parse entries JSON in search")
-                if 'recipe_id' not in row and row.get('name'):
-                    row['recipe_id'] = row.get('name')
             logger.debug(f"Found {len(rows) if rows else 0} recipes matching '{query_str}'")
             return rows
         except Exception as e:
