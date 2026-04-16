@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from streamlit_ui.errors import APIError
+from streamlit_ui.utils.errors import APIError
 
 
 class HTTPXClient:

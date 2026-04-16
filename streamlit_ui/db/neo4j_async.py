@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from neo4j import AsyncDriver, AsyncGraphDatabase
+from neo4j import  AsyncGraphDatabase
 
 
 class AsyncNeo4jClient:

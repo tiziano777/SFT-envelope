@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 
 async def check_neo4j_health(client: AsyncNeo4jClient) -> bool:

@@ -30,14 +30,21 @@ Ricorda che hai a disposizione le skill di claude per ottimizzare contesto, legg
 
 ### 1.1 Contesto
 
-Il progetto **FineTuning-Envelope** è un generatore di scaffold per esperimenti di fine-tuning LLM. Ogni scaffold (`setups/setup_{name}/`) contiene script di training, configurazioni, requisiti e reward functions.
+Il progetto **FineTuning-Envelope** ha 3 componenti distinti:
+- generatore di scaffold per esperimenti di fine-tuning LLM. Ogni scaffold (`setups/setup_{name}/`) contiene script di training, configurazioni, requisiti e reward functions. Affiancata anche UI per metadatazione di campi informativi, visualizzazione delle ramificazioni degli esperimenti (lineage), load di recipe, procedura grafica per creazione di un setup.
+- Architettura master e worker. Quando un setup è creato, esso puo essere scaricato su una macchian dotata di GPU o sulla macchina stessa, esso diventa un worker che comunica co nun server master che si ocupa di ricevere e salvare nel DB ogni elaborazione fatta dai workers.
 
-L'obiettivo di questa fase è estendere il sistema con un **layer di tracciamento del lineage** che:
+QUINDI: 
+1) Envelope è un componente di analitica e creazione di setup per workers.
+2) master è u server che comunica nel Db e slva nel fs ogni esperimento, con ckp e metriche relative.
+3) worker è il setup in esecuzione, che genera informazioni e le invia al nodo master per allineamento.
 
-- Registra ogni esperimento, checkpoint e relazione di derivazione in un grafo Neo4j.
+Obiettivi:
+
+- Registrare ogni esperimento, checkpoint e relazione di derivazione in un grafo Neo4j.
 - Funziona su macchine fisicamente separate (GPU worker ↔ DB master) con comunicazione asincrona.
-- Si integra nel generatore esistente senza rompere nulla: ogni nuovo scaffold includerà automaticamente il middleware Worker.
-- Il master crea dei scaffold/setup, che vengono scritti manualmente sul worker (copia fisica sia nel envelope che su GPU worker), il setup è autoconsistente e ha i moduli per comunicare risultati del train al master che scrive tutto nel DB.
+- UI e envelope(generator) integrati, con scopo di generare correttamente scaffold autoconsistenti, includendo automaticamente il middleware Worker e ogni file necessario.
+- Quando scaffold/setup vengono scritti manualmente sul worker (copia fisica sia nel envelope che su GPU worker), il setup è autoconsistente e ha i moduli per comunicare risultati del train al master che scrive tutto nel DB.
 
 ### 1.2 Architettura a Due Macchine
 
@@ -45,6 +52,8 @@ L'obiettivo di questa fase è estendere il sistema con un **layer di tracciament
 ┌─────────────────────────────────┐        ┌──────────────────────────────────┐
 │          WORKER (GPU)           │        │           MASTER (CPU)           │
 │                                 │        │                                  │
+│  config.py/requirements/rewards │        │                                  │
+│  prepare.py → dati in cache     │        │                                  │
 │  train.py ──→ emette eventi     │        │  FastAPI (master/api/)           │
 │  daemon.py ──→ raccoglie eventi │──SSH──▶│  LineageController               │
 │  pusher.py ──→ coda asincrona   │  HTTP  │  Neo4j Repository                │
@@ -62,8 +71,10 @@ L'obiettivo di questa fase è estendere il sistema con un **layer di tracciament
 
 Il Worker non attende il Master: scrive localmente e sincronizza in background. Il protocollo di comunicazione è astratto (SSH in produzione, HTTP per test locali).
 
-Nota: Il worker però deve sapere quello che sta facendo, che esperimento sta eseguendo (exp_id)
-
+Note: 
+- Il worker però deve sapere quello che sta facendo, che esperimento sta eseguendo (exp_id)
+- dal base experiment, poi puo generare forks, worker genererà lui stesso uuid da passare, creando nuovo ogetto pronto per il flush, questo richiede che il primo esperimento del setup (base_experiment) deve pero essere definito dal master.
+- responsabilità di worker e master ncora da definire chiaramente, focus massima resilienza e non-blocking execution bypassando communication errors, local disk as persistence.
 ---
 
 ## 2. Struttura del Progetto
@@ -200,23 +211,40 @@ class RecipeNode(BaseModel):
     recipe_id: str          # UUID
     name: str               # UNIQUE
     description: str
+    derived_from: Optional[str]   # UUID auto-riferimento
+    entries: list[RecipeEntry] 
     scope: str
     tasks: list[str]
     tags: list[str]
     issued: datetime
     modified: datetime
-    derived_from: Optional[str]   # UUID auto-riferimento
-    config_yaml: str        # config.yaml frozen, recipe conf non deve cambiare mai!
+    
 ```
 
-Il campo `config_yaml` contiene uno snapshot delle location dei vari datasets:
+Il file recipe da uploadare contiene uno snapshot delle location dei vari datasets, conrelative info su replica e altri metadati:
 
 ```yaml
-/path/to/dataset/ARC-Challenge/downsampled__0.7__en:
-  chat_type: simple_chat_cycle2
-  dist_id: ecef45fc-ba10-471d-a8ba-39172cdbf388
-  samples: 1603
-  tokens: 141889
+recipe_id: ee81b902-7672-4253-8326-4f870bea10f5
+name: r1
+description: r1
+scope: ...
+task: []
+tags: []
+derived_from: uuid
+entries:
+  /path/to/dataset/ARC-Challenge/en:
+    dist_id: a9a55ac3-e220-480d-a06e-cc4005960414
+    dist_name: mapped__ARC-Challenge__en
+    dist_uri: /path/to/dataset/ARC-Challenge/en
+    tokenized_uri: null
+    chat_type: context_chat
+    system_prompt: &id001 []
+    system_prompt_name: &id002 []
+    replica: 1
+    samples: 2590
+    tokens: 179178
+    words: 129464
+    validation_error: null
 ```
 
 #### `Model`
@@ -249,7 +277,6 @@ Istanza di esecuzione. Cuore del tracciamento.
 | `rewards` | list[str] | Lista dei contenuti testuali di ciascun file in `rewards/*`, nello stesso ordine di `rewards_filenames` |
 | `rewards_filenames` | list[str] | Nomi dei file in `rewards/*` corrispondenti a `rewards` (es. `["math_reward.py", "format_reward.py"]`) |
 | `requirements` | str | Contenuto testuale di `requirements.txt` (testo semplice) |
-| `hyperparams_json` | str | JSON degli iperparametri risolti al momento dell'handshake |
 | `scaffold_local_uri` | str | Path scaffold su worker |
 | `scaffold_remote_uri` | str | Path scaffold su master/storage |
 | `usable` | bool | L'esperimento è considerato valido |
@@ -300,7 +327,11 @@ Stack tecnologico: coppia (framework, tecnica SFT). Racchiude implicitamente la 
 (Experiment) -[:RETRY_OF]→                        (Experiment)   # Stesso setup, nuovo tentativo
 
 (Checkpoint) -[:MERGED_FROM]→  (Checkpoint)    # Merge N-a-1 di pesi
+(Checkpoint) -[:PROMOTED_TO]→  (Model)    # with kind == ADAPTER
+(Model) -[:MERGED_FROM]→  (Model)    # Merge N-a-1 di pesi dei modelli, sia Adapter che modelli base che richiedono fusione con adapters.
 ```
+
+NOTA: per il finetuning abbiamo applicato convenzione che ignora il model merging di modelli base, i nostri ckp produrranno tutti adapters.
 
 #### Proprietà della relazione `DERIVED_FROM`
 
@@ -309,7 +340,6 @@ Il campo `diff_patch` contiene il diff git-style completo tra i file dell'experi
 | Campo | Tipo |
 |-------|------|
 | `config` | list[json] | 
-| `hyperparams` | list[json] |
 | `train` | list[json] | 
 | `rewards` | list[json] | 
 | `requirements` | list[json] |
@@ -332,6 +362,7 @@ esempio di json object:
 
 ```cypher
 CREATE CONSTRAINT recipe_id     IF NOT EXISTS FOR (r:Recipe)     REQUIRE r.recipe_id IS UNIQUE;
+CREATE CONSTRAINT name     IF NOT EXISTS FOR (r:Recipe)     REQUIRE r.name IS UNIQUE;
 CREATE CONSTRAINT experiment_id IF NOT EXISTS FOR (e:Experiment) REQUIRE e.exp_id IS UNIQUE;
 CREATE CONSTRAINT checkpoint_id IF NOT EXISTS FOR (c:Checkpoint) REQUIRE c.ckp_id IS UNIQUE;
 CREATE CONSTRAINT model_name    IF NOT EXISTS FOR (m:Model)      REQUIRE m.model_name IS UNIQUE;
@@ -390,7 +421,7 @@ Definisce tutti i nodi, le relazioni e gli envelope operativi. È il contratto c
 ```python
 # Nodi Neo4j
 class RecipeNode(BaseModel): ...
-class ModelNode(BaseModel): ...
+class ModelNode(BaseModel): ... important: kind: str = Field("", description=" BASE | ADAPTER | MERGED ")
 class ExperimentNode(BaseModel): ...
 class CheckpointNode(BaseModel): ...
 class ComponentNode(BaseModel): ...
@@ -405,6 +436,7 @@ class RelationType(str, Enum):
     STARTED_FROM = "STARTED_FROM"
     RETRY_OF = "RETRY_OF"
     MERGED_FROM = "MERGED_FROM"
+    PROMOTED_TO = "PROMOTED_TO"
 
 # Relazione con payload
 class DerivedFromRel(BaseModel):
@@ -651,7 +683,7 @@ Gestisce `lineage/worker_state.json`. Ogni modifica è atomica (write su tmp + r
 ```json
 {
   "scaffold_dir": "/path/to/setup_grpo-math-v1",
-  "current_exp_id": "uuid-or-null",
+  "current_exp_id": "uuid",
   "current_run": 0,
   "strategy": "NEW|RESUME|BRANCH|RETRY",
   "config_snapshot": { "...ConfigSnapshot..." },
@@ -997,7 +1029,7 @@ Quando uno scaffold viene generato a partire da un Recipe, la sezione dataset vi
 ```yaml
 # config.yaml dello scaffold — sezione dataset generata da Recipe
 datamix:
-  format: rl                    # formato che indica il tipo di train conf, anche se abbiamo schema_template a dircelo implicitamente, fai in modo che sia solo un metadato informativo
+  format: rl                    # formato che indica il tipo di train conf, anche se abbiamo  a dircelo implicitamente, fai in modo che sia solo un metadato informativo
   split_train: train
   split_eval: test
   prepare:
@@ -1016,8 +1048,7 @@ datamix:
         - p1
       dist_id: UUID
       dist_uri: ...
-      schema_template: ...
-  
+      
 
     - uri: /nfs/mapped-data/velvet_v1/openai/gsm8k/main/en
       replica: 3
@@ -1030,7 +1061,7 @@ datamix:
         - p2
       dist_id: UUID
       dist_uri: ...
-      schema_template: ...
+
 ```
 Semantica di replica: il dataset viene campionato replica volte nel mix. Un dataset con replica: 3 contribuisce al triplo dei sample rispetto a uno con replica: 1.
 

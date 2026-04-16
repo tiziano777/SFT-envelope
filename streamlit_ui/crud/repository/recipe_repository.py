@@ -61,8 +61,8 @@ class RecipeRepository:
                         logger.exception("Failed to parse entries JSON for recipe %s", name)
                 entry_count = len(row.get('entries', {})) if row.get('entries') else 0
                 logger.debug(f"Recipe found: {name} (entry_count={entry_count})")
-                if 'recipe_id' not in row and row.get('name'):
-                    row['recipe_id'] = row.get('name')
+                if 'id' not in row and row.get('name'):
+                    row['id'] = row.get('name')
                 return row
             logger.debug(f"Recipe not found: {name}")
             return None
@@ -70,9 +70,9 @@ class RecipeRepository:
             logger.error(f"Failed to get recipe by name: {e}")
             raise UIError(f"Failed to retrieve recipe: {str(e)}")
 
-    async def get_by_recipe_id(self, recipe_id: str) -> Optional[dict]:
-        """Retrieve recipe by recipe_id."""
-        logger.debug(f"Querying recipe by recipe_id: {recipe_id}")
+    async def get_by_id(self, id: str) -> Optional[dict]:
+        """Retrieve recipe by ID."""
+        logger.debug(f"Querying recipe by ID: {id}")
         try:
             query = """
             MATCH (r:Recipe {id: $id})
@@ -80,7 +80,7 @@ class RecipeRepository:
                    r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
                    r.entries as entries, r.created_at as created_at, r.updated_at as updated_at
             """
-            result = await self.db.query(query, {"id": recipe_id})
+            result = await self.db.query(query, {"id": id})
             if result:
                 row = result[0]
                 entries_val = row.get('entries')
@@ -88,7 +88,7 @@ class RecipeRepository:
                     try:
                         row['entries'] = json.loads(entries_val)
                     except Exception:
-                        logger.exception("Failed to parse entries JSON for recipe_id %s", recipe_id)
+                        logger.exception("Failed to parse entries JSON for recipe_id %s", id)
                 return row
             return None
         except Exception as e:
@@ -130,25 +130,29 @@ class RecipeRepository:
             # Extract metadata (all optional at YAML load time)
             yaml_name = data.get("name")
             yaml_description = data.get("description") if "description" in data else None
-            yaml_recipe_id = data.get("recipe_id")
+            yaml_id = data.get("id")
             yaml_scope = data.get("scope")
             yaml_tasks = data.get("task") or data.get("tasks", [])  # Support both singular/plural
             yaml_tags = data.get("tags", [])
             yaml_derived_from = data.get("derived_from")
 
-            logger.debug(f"[DEBUG] Parsed YAML: name={yaml_name} recipe_id={yaml_recipe_id} entries={len(entries_data)}")
+            logger.debug(f"[DEBUG] Parsed YAML: name={yaml_name} id={yaml_id} entries={len(entries_data)}")
 
             # Create Recipe to validate entries structure
-            config = Recipe(
-                id=yaml_recipe_id,
-                name=yaml_name,
-                entries=entries_data,
-                description=yaml_description,
-                scope=yaml_scope,
-                tasks=yaml_tasks,
-                tags=yaml_tags,
-                derived_from=yaml_derived_from
-            )
+            # Only pass id if provided in YAML; otherwise let default_factory generate it
+            recipe_kwargs = {
+                "name": yaml_name,
+                "entries": entries_data,
+                "description": yaml_description,
+                "scope": yaml_scope,
+                "tasks": yaml_tasks,
+                "tags": yaml_tags,
+                "derived_from": yaml_derived_from
+            }
+            if yaml_id is not None:
+                recipe_kwargs["id"] = yaml_id
+
+            config = Recipe(**recipe_kwargs)
             logger.info(f"Recipe YAML parsed: name={config.name} entries={len(config.entries)}")
 
             # Convert entries to plain dicts
@@ -158,18 +162,18 @@ class RecipeRepository:
             }
 
             # Determine recipe_id: use provided or generate new UUID
-            if yaml_recipe_id:
-                recipe_id = str(yaml_recipe_id)
+            if yaml_id:
+                recipe_id = str(yaml_id)
             else:
                 recipe_id = str(uuid.uuid4())
 
-            final_description = description if description is not None else yaml_description
+            final_description = description if description and description.strip() else yaml_description
 
             logger.info("Creating recipe from YAML: recipe_id=%s name=%s entry_count=%d", recipe_id, config.name, len(entries_dict))
 
             # Delegate to create() for database insertion
             result = await self.create(
-                recipe_id=recipe_id,
+                id=recipe_id,
                 name=config.name,
                 entries=entries_dict,
                 description=final_description,
@@ -190,7 +194,7 @@ class RecipeRepository:
 
     async def create(
         self,
-        recipe_id: str,
+        id: str,
         name: str,
         entries: dict,
         description: str = "",
@@ -202,7 +206,7 @@ class RecipeRepository:
         """Create a new recipe.
 
         Args:
-            recipe_id: Unique recipe ID.
+            id: Unique recipe ID.
             name: Unique recipe name.
             entries: Dictionary mapping paths to RecipeEntry data.
             description: Optional recipe description.
@@ -219,16 +223,16 @@ class RecipeRepository:
             UIError: If database query fails.
         """
         # Check uniqueness by recipe_id first
-        logger.debug("Checking recipe uniqueness: recipe_id=%s name=%s", recipe_id, name)
-        existing_by_id = await self.get_by_recipe_id(recipe_id)
+        logger.debug("Checking recipe uniqueness: id=%s name=%s", id, name)
+        existing_by_id = await self.get_by_id(id)
         if existing_by_id:
-            logger.warning("Recipe recipe_id already exists: %s", recipe_id)
-            raise DuplicateRecipeError(recipe_id, recovery_suggestions=[f"{recipe_id}_dup"])
+            logger.warning("Recipe id already exists: %s", id)
+            raise DuplicateRecipeError(id, recovery_suggestions=[f"{id}_dup"])
 
         # If name provided, ensure name is unique
         if name:
             existing_by_name = await self.get_by_name(name)
-            if existing_by_name and existing_by_name.get('recipe_id') != recipe_id:
+            if existing_by_name and existing_by_name.get('id') != id:
                 logger.warning("Recipe name already exists: %s", name)
                 suggestions = [f"{name}_v1", f"{name}_v2", f"{name}_backup"]
                 raise DuplicateRecipeError(name, recovery_suggestions=suggestions)
@@ -261,7 +265,7 @@ class RecipeRepository:
                 raise UIError("Failed to serialize recipe entries for storage")
 
             result = await self.db.query(query, {
-                "id": recipe_id,
+                "id": id,
                 "name": name,
                 "description": description,
                 "scope": scope,
@@ -311,14 +315,14 @@ class RecipeRepository:
         Raises:
             UIError: If recipe not found or conflict occurs.
         """
-        existing = await self.get_by_recipe_id(recipe_id)
+        existing = await self.get_by_id(recipe_id)
         if not existing:
             raise UIError(f"Recipe not found")
 
         # Check new name uniqueness if changing
         if new_name and new_name != existing.get('name'):
             conflict = await self.get_by_name(new_name)
-            if conflict and conflict.get('recipe_id') != recipe_id:
+            if conflict and conflict.get('id') != recipe_id:
                 raise UIError(f"Recipe '{new_name}' already exists")
 
         try:
@@ -372,7 +376,7 @@ class RecipeRepository:
         Returns:
             True if recipe has no related experiments, False otherwise.
         """
-        existing = await self.get_by_recipe_id(recipe_id)
+        existing = await self.get_by_id(recipe_id)
         if not existing:
             return True  # Doesn't exist, considered deletable
         recipe_name = existing.get("name")
@@ -389,7 +393,7 @@ class RecipeRepository:
         Raises:
             UIError: If recipe not found, has related experiments, or query fails.
         """
-        existing = await self.get_by_recipe_id(recipe_id)
+        existing = await self.get_by_id(recipe_id)
         if not existing:
             raise UIError(f"Recipe '{recipe_id}' not found")
 

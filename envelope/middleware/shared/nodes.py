@@ -46,6 +46,7 @@ class ModelNode(BaseNode):
     doc_url: str = ""
     architecture_info_ref: str = ""
     description: str = ""
+    kind: str = Field("", description=" BASE | ADAPTER | MERGED ")
 
 
 class ExperimentNode(BaseNode):

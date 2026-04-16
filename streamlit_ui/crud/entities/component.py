@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from .base import BaseEntity
 
 
-class Component(BaseModel):
+class Component(BaseEntity):
     """Component entity -- (technique, framework) pair from capability matrix.
 
     A Component represents a validated combination of technique + framework.
@@ -15,7 +16,6 @@ class Component(BaseModel):
     Example: (grpo, unsloth) exists, (unknown, unsloth) doesn't exist → query returns None
     """
 
-    id: str = Field(..., min_length=1, description="UUID primary key")
     description: str = Field("", description="Component description")
     
     technique_code: str = Field(..., min_length=1, description="Technique code (e.g., grpo, sft)")
@@ -23,6 +23,3 @@ class Component(BaseModel):
     opt_code: str = Field("", description="Optimization code")
     
     docs_url: str = Field("", description="Documentation URL")
-    
-    created_at: str | None = None
-    updated_at: str | None = None

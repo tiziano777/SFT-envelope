@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 
 @pytest.mark.asyncio

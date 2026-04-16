@@ -25,6 +25,7 @@ class RelationType(str, Enum):
     STARTED_FROM = "STARTED_FROM"
     RETRY_OF = "RETRY_OF"
     MERGED_FROM = "MERGED_FROM"
+    PROMOTED_TO = "PROMOTED_TO"
 
 
 # --- Relationship Models ---

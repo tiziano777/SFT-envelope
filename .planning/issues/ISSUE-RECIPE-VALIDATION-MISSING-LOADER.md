@@ -159,7 +159,7 @@ None available. Issue blocks all recipe uploads via UI.
 Since your data is **distribution metadata** (not training setup), implemented auto-detecting validation:
 
 1. **`envelope/config/models.py`**: Added RecipeConfig schema
-   - `RecipeEntry`: dist_id, dist_name, dist_uri, samples, tokens, schema_template
+   - `RecipeEntry`: dist_id, dist_name, dist_uri, samples, tokens
    - `RecipeConfig`: wrapper mapping paths → RecipeEntry objects
 
 2. **`envelope/config/loader.py`**: Added `load_recipe_yaml()`

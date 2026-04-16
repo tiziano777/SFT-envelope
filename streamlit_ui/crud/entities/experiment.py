@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import  Field
+from .base import BaseEntity
 
-
-class Experiment(BaseModel):
+class Experiment(BaseEntity):
     """Experiment entity -- core tracking entity for a training run."""
 
-    id: str = Field(..., min_length=1, description="UUID primary key")
     exp_id: str = Field(..., min_length=1, description="Unique experiment ID")
     model_id: str = Field("", description="Associated Model ID")
     description: str = Field("", description="Experiment description")
@@ -37,5 +36,3 @@ class Experiment(BaseModel):
     metrics_uri: str = Field("", description="Pointer to training metrics")
     hw_metrics_uri: str = Field("", description="Pointer to hardware metrics")
     
-    created_at: str | None = None
-    updated_at: str | None = None

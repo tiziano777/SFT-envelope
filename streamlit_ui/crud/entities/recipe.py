@@ -32,7 +32,7 @@ class Recipe(BaseEntity):
         Filename format: "my_recipe.yaml" → "my_recipe"
     """
 
-    name: str | None = Field(None, min_length=1, description="Recipe name (must be unique)")
+    name: str  = Field(None, min_length=1, description="Recipe name (must be unique)")
     description: str | None = Field(None, description="Recipe description")
     scope: str | None = Field(None, description="Scope for this recipe (e.g., 'sft', 'preference', 'rl')")
     tasks: list[str] = Field(default_factory=list, description="Tasks associated with this recipe")

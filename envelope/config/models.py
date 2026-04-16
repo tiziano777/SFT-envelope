@@ -5,7 +5,6 @@ for configuration structure across the entire envelope system.
 """
 
 from __future__ import annotations
-
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -475,9 +474,11 @@ class RecipeConfig(BaseModel):
     """
     recipe_id: str | None = Field(None, description="Unique recipe identifier (optional, can be set to name or UUID)")
     name: str | None = Field(None, min_length=1, description="Recipe name (must be unique)")
+    description: str | None = Field(None, description="Recipe description")
+    scope: str | None = Field(None, description="Scope for this recipe (e.g., 'sft', 'preference', 'rl')")
+    tags: list[str] = Field([], description="Tags for categorizing recipes")
     entries: dict[str, RecipeEntry] = Field(
         ...,
-        min_length=1,
         description="Mapping of dataset paths to distribution metadata"
     )
 

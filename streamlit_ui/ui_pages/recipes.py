@@ -84,7 +84,8 @@ def run() -> None:
                     entries_count = len(config.entries) if hasattr(config, 'entries') and config.entries else 0
                     yaml_name = getattr(config, 'name', None)
                     yaml_id = getattr(config, 'id', None)
-                    st.info(f"**Name:** {yaml_name or 'N/A'} | **Recipe ID:** {yaml_id or 'N/A'} | **Entries:** {entries_count}")
+                    yaml_description = getattr(config, 'description', None)
+                    st.info(f"**Name:** {yaml_name or 'N/A'} | **Recipe ID:** {yaml_id or 'N/A'} | **Description:** {yaml_description or 'N/A'} | **Entries:** {entries_count}")
                     logger.info("Validation passed for %s: detected_entries=%d", uploaded_file.name, entries_count)
                     try:
                         keys = list(config.entries.keys()) if hasattr(config, 'entries') and config.entries else []
@@ -100,7 +101,8 @@ def run() -> None:
                             logger.info(f"[INFO] YAML content: {yaml_content}")
                             result = asyncio.run(
                                 create_recipe_async(
-                                    yaml_content=yaml_content
+                                    yaml_content=yaml_content,
+                                    description=yaml_description or ""
                                 )
                             )
                             logger.debug("Create recipe result: %s", result)

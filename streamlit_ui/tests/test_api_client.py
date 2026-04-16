@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from streamlit_ui.api_client import HTTPXClient
+from streamlit_ui.utils.api_client import HTTPXClient
 
 
 @pytest.mark.asyncio

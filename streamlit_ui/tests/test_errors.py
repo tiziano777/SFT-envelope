@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from streamlit_ui.errors import APIError, DeleteProtectionError, UIError, ValidationError
+from streamlit_ui.utils.errors import APIError, DeleteProtectionError, UIError, ValidationError
 
 
 def test_ui_error_user_message():
