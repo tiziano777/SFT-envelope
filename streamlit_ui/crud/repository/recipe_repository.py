@@ -6,8 +6,9 @@ import json
 import logging
 from typing import Optional
 
-from streamlit_ui.errors import UIError, DuplicateRecipeError
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.utils.errors import UIError, DuplicateRecipeError
+from streamlit_ui.utils.entity_constraints import EntityConstraints
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class RecipeRepository:
             db_client: AsyncNeo4jClient for database queries.
         """
         self.db = db_client
+        self.constraints = EntityConstraints(db_client)
 
     async def get_by_name(self, name: str) -> Optional[dict]:
         """Retrieve recipe by name.
@@ -39,9 +41,9 @@ class RecipeRepository:
         try:
             query = """
             MATCH (r:Recipe {name: $name})
-            RETURN r.recipe_id as recipe_id, r.name as name, r.description as description,
-                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.entries as entries,
-                   r.created_at as created_at
+            RETURN r.id as recipe_id, r.name as name, r.description as description,
+                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
+                   r.entries as entries, r.created_at as created_at, r.updated_at as updated_at
             """
             result = await self.db.query(query, {"name": name})
             if result:
@@ -68,12 +70,12 @@ class RecipeRepository:
         logger.debug(f"Querying recipe by recipe_id: {recipe_id}")
         try:
             query = """
-            MATCH (r:Recipe {recipe_id: $recipe_id})
-            RETURN r.recipe_id as recipe_id, r.name as name, r.description as description,
-                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.entries as entries,
-                   r.created_at as created_at
+            MATCH (r:Recipe {id: $id})
+            RETURN r.id as recipe_id, r.name as name, r.description as description,
+                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
+                   r.entries as entries, r.created_at as created_at, r.updated_at as updated_at
             """
-            result = await self.db.query(query, {"recipe_id": recipe_id})
+            result = await self.db.query(query, {"id": recipe_id})
             if result:
                 row = result[0]
                 entries_val = row.get('entries')
@@ -97,6 +99,7 @@ class RecipeRepository:
         scope: str = "",
         tasks: list[str] | None = None,
         tags: list[str] | None = None,
+        derived_from: str | None = None,
     ) -> dict:
         """Create a new recipe.
 
@@ -108,6 +111,7 @@ class RecipeRepository:
             scope: Optional scope (e.g., 'sft', 'preference', 'rl').
             tasks: Optional list of tasks.
             tags: Optional list of tags.
+            derived_from: Optional UUID of parent recipe this was derived from.
 
         Returns:
             Created recipe data.
@@ -136,17 +140,20 @@ class RecipeRepository:
             logger.info(f"Inserting recipe: name={name}, entry_count={entry_count}")
             query = """
             CREATE (r:Recipe {
-                recipe_id: $recipe_id,
+                id: $id,
                 name: $name,
                 description: $description,
                 scope: $scope,
                 tasks: $tasks,
                 tags: $tags,
+                derived_from: $derived_from,
                 entries: $entries,
-                created_at: datetime()
+                created_at: datetime(),
+                updated_at: datetime()
             })
-            RETURN r.recipe_id as recipe_id, r.name as name, r.description as description,
-                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.entries as entries
+            RETURN r.id as id, r.name as name, r.description as description,
+                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
+                   r.entries as entries, r.updated_at as updated_at
             """
             # Serialize entries to JSON string
             try:
@@ -156,12 +163,13 @@ class RecipeRepository:
                 raise UIError("Failed to serialize recipe entries for storage")
 
             result = await self.db.query(query, {
-                "recipe_id": recipe_id,
+                "id": recipe_id,
                 "name": name,
                 "description": description,
                 "scope": scope,
                 "tasks": tasks or [],
                 "tags": tags or [],
+                "derived_from": derived_from,
                 "entries": entries_payload,
             })
             if result:
@@ -237,7 +245,7 @@ class RecipeRepository:
             MATCH (r:Recipe {{recipe_id: $recipe_id}})
             SET {set_clause}
             RETURN r.recipe_id as recipe_id, r.name as name, r.description as description,
-                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.entries as entries
+                   r.scope as scope, r.tasks as tasks, r.tags as tags, r.derived_from as derived_from, r.entries as entries
             """
             params = {"recipe_id": recipe_id, **updates}
             result = await self.db.query(query, params)
@@ -257,6 +265,23 @@ class RecipeRepository:
             logger.error(f"Recipe update failed: {recipe_id}", exc_info=True)
             raise UIError(f"Failed to update recipe: {str(e)}")
 
+    async def is_deletable(self, recipe_id: str) -> bool:
+        """Check if recipe can be deleted (no related experiments).
+
+        Args:
+            recipe_id: Recipe ID to check.
+
+        Returns:
+            True if recipe has no related experiments, False otherwise.
+        """
+        existing = await self.get_by_recipe_id(recipe_id)
+        if not existing:
+            return True  # Doesn't exist, considered deletable
+        recipe_name = existing.get("name")
+        if recipe_name:
+            return await self.constraints.is_recipe_deletable(recipe_name)
+        return True
+
     async def delete(self, recipe_id: str) -> None:
         """Delete recipe by recipe_id.
 
@@ -264,11 +289,19 @@ class RecipeRepository:
             recipe_id: Recipe ID to delete.
 
         Raises:
-            UIError: If recipe not found or query fails.
+            UIError: If recipe not found, has related experiments, or query fails.
         """
         existing = await self.get_by_recipe_id(recipe_id)
         if not existing:
             raise UIError(f"Recipe '{recipe_id}' not found")
+
+        # Check if recipe can be deleted (no related experiments)
+        if not await self.is_deletable(recipe_id):
+            recipe_name = existing.get("name", recipe_id)
+            raise UIError(
+                f"Cannot delete recipe '{recipe_name}': it's used by one or more experiments. "
+                "Remove experiments first before deleting the recipe."
+            )
 
         try:
             logger.info("Deleting recipe: recipe_id=%s", recipe_id)
@@ -293,8 +326,8 @@ class RecipeRepository:
             query = """
             MATCH (r:Recipe)
             RETURN r.name as name, r.description as description, r.scope as scope,
-                   r.tasks as tasks, r.tags as tags, r.created_at as created_at,
-                   r.entries as entries, r.recipe_id as recipe_id
+                   r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
+                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries, r.recipe_id as recipe_id
             ORDER BY r.created_at DESC
             """
             result = await self.db.query(query)
@@ -330,8 +363,8 @@ class RecipeRepository:
             query = """
             MATCH (r:Recipe)
             RETURN r.name as name, r.description as description, r.scope as scope,
-                   r.tasks as tasks, r.tags as tags, r.created_at as created_at,
-                   r.entries as entries, r.recipe_id as recipe_id, id(r) as id
+                   r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
+                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries, r.recipe_id as recipe_id, id(r) as id
             ORDER BY r.created_at DESC
             LIMIT $limit
             """
@@ -369,8 +402,8 @@ class RecipeRepository:
             MATCH (r:Recipe)
             WHERE toLower(r.name) CONTAINS toLower($query)
             RETURN r.name as name, r.description as description, r.scope as scope,
-                   r.tasks as tasks, r.tags as tags, r.created_at as created_at,
-                   r.entries as entries, r.recipe_id as recipe_id, id(r) as id
+                   r.tasks as tasks, r.tags as tags, r.derived_from as derived_from,
+                   r.created_at as created_at, r.updated_at as updated_at, r.entries as entries, r.recipe_id as recipe_id, id(r) as id
             ORDER BY r.created_at DESC
             """
             result = await self.db.query(cypher_query, {"query": query_str})

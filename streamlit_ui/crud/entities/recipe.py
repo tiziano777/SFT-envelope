@@ -1,11 +1,9 @@
 """Pydantic models for Recipe entity."""
 
 from __future__ import annotations
-
 from pathlib import Path
-from typing import Any
-
 from pydantic import BaseModel, Field, model_validator
+from .base import BaseEntity
 
 
 class RecipeEntry(BaseModel):
@@ -23,10 +21,10 @@ class RecipeEntry(BaseModel):
     words: int = Field(..., gt=0, description="Total word count")
     validation_error: str | None = Field(None, description="Validation error if any")
 
-class Recipe(BaseModel):
+class Recipe(BaseEntity):
     """Configuration for recipe/distribution metadata.
 
-    Maps dataset paths to their metadata entries with optional scope, tasks, and tags.
+    Maps dataset paths to their metadata entries with optional scope, tasks, tags, and derived_from.
 
     Note:
         name can be None at parse time (recipe from YAML without 'name' field).
@@ -34,12 +32,12 @@ class Recipe(BaseModel):
         Filename format: "my_recipe.yaml" → "my_recipe"
     """
 
-    recipe_id: str | None = Field(None, description="Unique recipe identifier (optional, can be set to name or UUID)")
     name: str | None = Field(None, min_length=1, description="Recipe name (must be unique)")
     description: str | None = Field(None, description="Recipe description")
     scope: str | None = Field(None, description="Scope for this recipe (e.g., 'sft', 'preference', 'rl')")
     tasks: list[str] = Field(default_factory=list, description="Tasks associated with this recipe")
     tags: list[str] = Field(default_factory=list, description="Tags for categorizing recipes")
+    derived_from: str | None = Field(None, description="Optional UUID of parent recipe this was derived from")
     entries: dict[str, RecipeEntry] = Field(
         ...,
         description="Mapping of dataset paths to distribution metadata"

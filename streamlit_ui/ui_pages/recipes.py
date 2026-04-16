@@ -8,66 +8,65 @@ import logging
 import streamlit as st
 
 from streamlit_ui.crud.recipe_manager import RecipeManager
-from streamlit_ui.errors import UIError, DuplicateRecipeError
-from streamlit_ui.utils import get_api_client, get_neo4j_client
-from streamlit_ui.validation import validate_recipe_yaml
+from streamlit_ui.utils.errors import UIError, DuplicateRecipeError
+from streamlit_ui.utils import get_neo4j_client
+from streamlit_ui.utils.validation import validate_recipe_yaml
+from streamlit_ui.utils.scope_enum import ScopeEnum
+from streamlit_ui.utils.task_enum import TaskEnum
 
 logger = logging.getLogger(__name__)
 
 # Async helper functions for recipe operations
-async def create_recipe_async(yaml_content: str, filename: str, description: str = "") -> dict:
+async def create_recipe_async(yaml_content: str, description: str = "") -> dict:
     """Create recipe asynchronously.
 
     Recipe name is derived from filename automatically (e.g., 'my_recipe.yaml' → 'my_recipe').
     """
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = RecipeManager(db_client, api_client)
-    # Use the richer RecipeManager.create_recipe signature (yaml_content, filename)
-    return await manager.create_recipe(yaml_content=yaml_content, filename=filename, description=description)
+    manager = RecipeManager(db_client)
+    return await manager.create_recipe(yaml_content=yaml_content, description=description)
 
 
 async def search_recipes_async(query: str) -> list[dict]:
     """Search recipes asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = RecipeManager(db_client, api_client)
+    manager = RecipeManager(db_client)
     return await manager.search_recipes(query)
 
 
 async def list_recipes_async(limit: int = 20) -> list[dict]:
     """List recipes asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = RecipeManager(db_client, api_client)
+    manager = RecipeManager(db_client)
     return await manager.list_recipes(limit=limit)
 
 
 async def update_recipe_async(recipe_name: str, description: str = "") -> dict:
     """Update recipe asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = RecipeManager(db_client, api_client)
+    manager = RecipeManager(db_client)
     return await manager.update(name=recipe_name, description=description)
 
 
 async def update_recipe_with_new_name_async(recipe_name: str, new_name: str | None = None, description: str = "") -> dict:
     """Update recipe name and/or description asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = RecipeManager(db_client, api_client)
-    # Interpret the first argument as recipe_id when called from UI
+    manager = RecipeManager(db_client)
     return await manager.update(recipe_id=recipe_name, new_name=new_name, description=description)
 
 
-async def delete_recipe_async(recipe_name: str) -> None:
+async def delete_recipe_async(recipe_id: str) -> None:
     """Delete recipe asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = RecipeManager(db_client, api_client)
-    # Accept recipe_id or name; pass as name param to maintain compatibility
-    await manager.delete(name=recipe_name)
+    manager = RecipeManager(db_client)
+    await manager.delete(recipe_id=recipe_id)
 
+
+async def is_recipe_deletable_async(recipe_id: str) -> bool:
+    """Check if recipe can be deleted asynchronously."""
+    db_client = get_neo4j_client()
+    manager = RecipeManager(db_client)
+    return await manager.is_deletable(recipe_id=recipe_id)
 
 def run() -> None:
     """Run recipe management page."""
@@ -108,10 +107,10 @@ def run() -> None:
 
                         try:
                             logger.info("Creating recipe from upload: filename=%s", uploaded_file.name)
+                            logger.info(f"[INFO] YAML content: {yaml_content}")
                             result = asyncio.run(
                                 create_recipe_async(
-                                    yaml_content=yaml_content,
-                                    filename=uploaded_file.name,
+                                    yaml_content=yaml_content
                                 )
                             )
                             logger.debug("Create recipe result: %s", result)
@@ -152,12 +151,19 @@ def run() -> None:
                 for recipe in recipes:
                     key_suffix = recipe.get("recipe_id") if recipe.get("recipe_id") is not None else recipe.get("name")
                     display_name = recipe.get('name') or recipe.get('recipe_id')
-                    with st.expander(f"📋 {display_name}", expanded=False):
+                    with st.expander(f"📋 {display_name} - {key_suffix}", expanded=False):
                         col1, col2 = st.columns([3, 1])
 
                         with col1:
+                            st.write(f"Recipe ID: {recipe.get('recipe_id', 'N/A')}")
                             st.write(f"**Description:** {recipe.get('description', 'N/A')}")
+                            
+                            st.write(f"**Scope:** {recipe.get('scope', 'N/A')}")
+                            st.write(f"**Tasks:** {', '.join(recipe.get('tasks', [])) if recipe.get('tasks') else 'N/A'}")
+                            st.write(f"**Tags:** {', '.join(recipe.get('tags', [])) if recipe.get('tags') else 'N/A'}")
+                            
                             st.caption(f"Created: {recipe.get('created_at', 'N/A')}")
+                            st.caption(f"Updated: {recipe.get('updated_at', 'N/A')}")
 
                             # Display recipe entries — show full metadata per RecipeEntry
                             entries = recipe.get("entries")
@@ -191,35 +197,75 @@ def run() -> None:
                                 st.info("No entries in this recipe")
 
                         with col2:
-                            if st.button("✏️ Edit", key=f"edit_{key_suffix}"):
-                                st.session_state[f"edit_recipe_{key_suffix}"] = True
+                            col_edit, col_delete = st.columns(2)
+                            with col_edit:
+                                if st.button("✏️ Edit", key=f"edit_{key_suffix}"):
+                                    st.session_state[f"edit_recipe_{key_suffix}"] = True
 
-                            # TODO: Implement deletion with proper dependency checking
-                            # Delete button disabled for now - recipes are immutable after creation
-                            # if st.button("🗑️ Delete", key=f"delete_{key_suffix}"):
-                            #     st.session_state[f"confirm_delete_{key_suffix}"] = True
+                            with col_delete:
+                                # Check if recipe can be deleted
+                                can_delete = asyncio.run(is_recipe_deletable_async(recipe.get('recipe_id') or recipe.get('name')))
+                                if st.button(
+                                    "🗑️ Delete",
+                                    key=f"delete_{key_suffix}",
+                                    disabled=not can_delete,
+                                    help="Delete is disabled if recipe is used by experiments"
+                                ):
+                                    st.session_state[f"confirm_delete_{key_suffix}"] = True
 
                         if st.session_state.get(f"edit_recipe_{key_suffix}", False):
                             st.divider()
                             st.subheader("Edit Recipe")
-                            # Allow editing name and description
+                            # Allow editing name, description, scope, tasks, and tags
                             new_name_input = st.text_input("Recipe Name", value=recipe.get('name') or '', key=f"new_name_{key_suffix}")
                             new_desc = st.text_area("Description", value=recipe.get('description') or '', key=f"new_desc_{key_suffix}")
+
+                            # Scope multiselect
+                            current_scope = recipe.get('scope')
+                            selected_scope = st.selectbox(
+                                "Scope",
+                                options=[None] + ScopeEnum.values(),
+                                index=0 if not current_scope else (ScopeEnum.values().index(current_scope) + 1) if current_scope in ScopeEnum.values() else 0,
+                                key=f"scope_{key_suffix}"
+                            )
+                            new_scope = selected_scope if selected_scope else None
+
+                            # Tasks multiselect
+                            current_tasks = recipe.get('tasks') or []
+                            selected_tasks = st.multiselect(
+                                "Tasks",
+                                options=TaskEnum.values(),
+                                default=current_tasks if current_tasks else [],
+                                key=f"tasks_{key_suffix}"
+                            )
+
+                            # Tags (free-form list)
+                            current_tags = recipe.get('tags') or []
+                            tags_text = st.text_area(
+                                "Tags (one per line)",
+                                value='\n'.join(current_tags) if current_tags else '',
+                                key=f"tags_{key_suffix}"
+                            )
+                            new_tags = [tag.strip() for tag in tags_text.split('\n') if tag.strip()]
 
                             col_save, col_cancel = st.columns(2)
                             with col_save:
                                 if st.button("Save Changes", key=f"save_edit_{key_suffix}"):
                                     try:
-                                        result = asyncio.run(update_recipe_with_new_name_async(
-                                            recipe_name=recipe.get('recipe_id') or recipe.get('name'),
-                                            new_name=new_name_input if new_name_input != recipe.get('name') else None,
-                                            description=new_desc
-                                        ))
+                                        result = asyncio.run(
+                                            RecipeManager(get_neo4j_client()).update(
+                                                recipe_id=recipe.get('recipe_id') or recipe.get('name'),
+                                                new_name=new_name_input if new_name_input != recipe.get('name') else None,
+                                                description=new_desc,
+                                                scope=new_scope,
+                                                tasks=selected_tasks if selected_tasks else None,
+                                                tags=new_tags if new_tags else None,
+                                            )
+                                        )
                                         st.success("✓ Recipe updated!")
                                         st.session_state[f"edit_recipe_{key_suffix}"] = False
                                         st.rerun()
                                     except UIError as e:
-                                        # If uniqueness violated, prompt user to choose another name and keep edit open
                                         msg = str(e)
                                         if "already exists" in msg or "exists" in msg:
                                             st.error(f"Name conflict: {msg}")
@@ -233,26 +279,24 @@ def run() -> None:
                                     st.rerun()
 
                         if st.session_state.get(f"confirm_delete_{key_suffix}", False):
-                            # TODO: Delete confirmation modal disabled - recipes are immutable after creation
-                            # Uncomment when deletion logic is properly implemented
-                            # st.divider()
-                            # st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name') or recipe.get('recipe_id')}'?")
-                            # col_confirm, col_cancel = st.columns(2)
+                            st.divider()
+                            st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name') or recipe.get('recipe_id')}'?")
+                            col_confirm, col_cancel = st.columns(2)
 
-                            # with col_confirm:
-                            #     if st.button("Yes, delete", key=f"confirm_delete_yes_{key_suffix}", type="primary"):
-                            #         try:
-                            #             asyncio.run(delete_recipe_async(recipe_name=recipe.get('recipe_id') or recipe.get('name')))
-                            #             st.success(f"✓ Recipe '{recipe.get('name') or recipe.get('recipe_id')}' deleted!")
-                            #             st.session_state[f"confirm_delete_{key_suffix}"] = False
-                            #             st.rerun()
-                            #         except UIError as e:
-                            #             st.error(f"Error: {e.user_message}")
+                            with col_confirm:
+                                if st.button("Yes, delete", key=f"confirm_delete_yes_{key_suffix}", type="primary"):
+                                    try:
+                                        asyncio.run(delete_recipe_async(recipe_id=recipe.get('recipe_id') or recipe.get('name')))
+                                        st.success(f"✓ Recipe '{recipe.get('name') or recipe.get('recipe_id')}' deleted!")
+                                        st.session_state[f"confirm_delete_{key_suffix}"] = False
+                                        st.rerun()
+                                    except UIError as e:
+                                        st.error(f"Error: {e.user_message}")
 
-                            # with col_cancel:
-                            #     if st.button("Cancel", key=f"cancel_delete_{key_suffix}"):
-                            #         st.session_state[f"confirm_delete_{key_suffix}"] = False
-                            #         st.rerun()
+                            with col_cancel:
+                                if st.button("Cancel", key=f"cancel_delete_{key_suffix}"):
+                                    st.session_state[f"confirm_delete_{key_suffix}"] = False
+                                    st.rerun()
             else:
                 st.info("No recipes found.")
         except UIError as e:
