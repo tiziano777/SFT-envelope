@@ -175,31 +175,34 @@ def run() -> None:
             st.error(f"Error: {e.user_message}")
 
     with tab_delete:
+        # TODO: Implement deletion with proper dependency checking
+        # Delete tab disabled for now - models should have comprehensive dependency logic
         st.subheader("Delete Model")
-        try:
-            models = asyncio.run(list_models_async())
-            model_names = {m['model_name']: m['id'] for m in models}
-
-            selected_name = st.selectbox("Select Model to Delete", list(model_names.keys()), key="delete")
-
-            if selected_name:
-                model_id = model_names[selected_name]
-
-                try:
-                    dep_count = asyncio.run(check_model_deps_async(model_id))
-
-                    if dep_count > 0:
-                        st.warning(f"⚠️ This model is used by {dep_count} recipe(s)/experiment(s). Cannot delete.")
-                    else:
-                        st.success("✓ No dependencies found. Safe to delete.")
-                        confirm = st.checkbox(f"I confirm deletion of '{selected_name}'")
-                        if confirm and st.button("Delete Model"):
-                            try:
-                                asyncio.run(delete_model_async(model_id))
-                                st.success("✓ Model deleted!")
-                            except UIError as e:
-                                st.error(f"Error: {e.user_message}")
-                except DeleteProtectionError as e:
-                    st.error(f"Delete Protected: {e.user_message}")
-        except UIError as e:
-            st.error(f"Error: {e.user_message}")
+        st.info("❌ Model deletion is not implemented. Contact an administrator if you need to delete a model.")
+        # try:
+        #     models = asyncio.run(list_models_async())
+        #     model_names = {m['model_name']: m['id'] for m in models}
+        #
+        #     selected_name = st.selectbox("Select Model to Delete", list(model_names.keys()), key="delete")
+        #
+        #     if selected_name:
+        #         model_id = model_names[selected_name]
+        #
+        #         try:
+        #             dep_count = asyncio.run(check_model_deps_async(model_id))
+        #
+        #             if dep_count > 0:
+        #                 st.warning(f"⚠️ This model is used by {dep_count} recipe(s)/experiment(s). Cannot delete.")
+        #             else:
+        #                 st.success("✓ No dependencies found. Safe to delete.")
+        #                 confirm = st.checkbox(f"I confirm deletion of '{selected_name}'")
+        #                 if confirm and st.button("Delete Model"):
+        #                     try:
+        #                         asyncio.run(delete_model_async(model_id))
+        #                         st.success("✓ Model deleted!")
+        #                     except UIError as e:
+        #                         st.error(f"Error: {e.user_message}")
+        #         except DeleteProtectionError as e:
+        #             st.error(f"Delete Protected: {e.user_message}")
+        # except UIError as e:
+        #     st.error(f"Error: {e.user_message}")

@@ -161,31 +161,7 @@ def run() -> None:
             st.error(f"Error: {e.user_message}")
 
     with tab_delete:
+        # TODO: Implement deletion with proper dependency checking
+        # Delete tab disabled for now - components should have comprehensive dependency logic
         st.subheader("Delete Component")
-        try:
-            components = asyncio.run(list_components_async())
-            comp_map = {f"{c['opt_code']} ({c['technique_code']})" : c["id"] for c in components}
-
-            selected_comp = st.selectbox("Select Component to Delete", list(comp_map.keys()), key="delete")
-
-            if selected_comp:
-                comp_id = comp_map[selected_comp]
-
-                try:
-                    dep_count = asyncio.run(check_component_deps_async(comp_id))
-
-                    if dep_count > 0:
-                        st.warning(f"⚠️ This component is used by {dep_count} recipe(s). Cannot delete.")
-                    else:
-                        st.success("✓ No dependencies found. Safe to delete.")
-                        confirm = st.checkbox(f"I confirm deletion of '{selected_comp}'")
-                        if confirm and st.button("Delete Component"):
-                            try:
-                                asyncio.run(delete_component_async(comp_id))
-                                st.success("✓ Component deleted!")
-                            except UIError as e:
-                                st.error(f"Error: {e.user_message}")
-                except DeleteProtectionError as e:
-                    st.error(f"Delete Protected: {e.user_message}")
-        except UIError as e:
-            st.error(f"Error: {e.user_message}")
+        st.info("❌ Component deletion is not implemented. Contact an administrator if you need to delete a component.")

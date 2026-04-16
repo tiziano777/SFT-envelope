@@ -194,8 +194,10 @@ def run() -> None:
                             if st.button("✏️ Edit", key=f"edit_{key_suffix}"):
                                 st.session_state[f"edit_recipe_{key_suffix}"] = True
 
-                            if st.button("🗑️ Delete", key=f"delete_{key_suffix}"):
-                                st.session_state[f"confirm_delete_{key_suffix}"] = True
+                            # TODO: Implement deletion with proper dependency checking
+                            # Delete button disabled for now - recipes are immutable after creation
+                            # if st.button("🗑️ Delete", key=f"delete_{key_suffix}"):
+                            #     st.session_state[f"confirm_delete_{key_suffix}"] = True
 
                         if st.session_state.get(f"edit_recipe_{key_suffix}", False):
                             st.divider()
@@ -231,24 +233,26 @@ def run() -> None:
                                     st.rerun()
 
                         if st.session_state.get(f"confirm_delete_{key_suffix}", False):
-                            st.divider()
-                            st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name') or recipe.get('recipe_id')}'?")
-                            col_confirm, col_cancel = st.columns(2)
+                            # TODO: Delete confirmation modal disabled - recipes are immutable after creation
+                            # Uncomment when deletion logic is properly implemented
+                            # st.divider()
+                            # st.warning(f"⚠️ Are you sure you want to delete '{recipe.get('name') or recipe.get('recipe_id')}'?")
+                            # col_confirm, col_cancel = st.columns(2)
 
-                            with col_confirm:
-                                if st.button("Yes, delete", key=f"confirm_delete_yes_{key_suffix}", type="primary"):
-                                    try:
-                                        asyncio.run(delete_recipe_async(recipe_name=recipe.get('recipe_id') or recipe.get('name')))
-                                        st.success(f"✓ Recipe '{recipe.get('name') or recipe.get('recipe_id')}' deleted!")
-                                        st.session_state[f"confirm_delete_{key_suffix}"] = False
-                                        st.rerun()
-                                    except UIError as e:
-                                        st.error(f"Error: {e.user_message}")
+                            # with col_confirm:
+                            #     if st.button("Yes, delete", key=f"confirm_delete_yes_{key_suffix}", type="primary"):
+                            #         try:
+                            #             asyncio.run(delete_recipe_async(recipe_name=recipe.get('recipe_id') or recipe.get('name')))
+                            #             st.success(f"✓ Recipe '{recipe.get('name') or recipe.get('recipe_id')}' deleted!")
+                            #             st.session_state[f"confirm_delete_{key_suffix}"] = False
+                            #             st.rerun()
+                            #         except UIError as e:
+                            #             st.error(f"Error: {e.user_message}")
 
-                            with col_cancel:
-                                if st.button("Cancel", key=f"cancel_delete_{key_suffix}"):
-                                    st.session_state[f"confirm_delete_{key_suffix}"] = False
-                                    st.rerun()
+                            # with col_cancel:
+                            #     if st.button("Cancel", key=f"cancel_delete_{key_suffix}"):
+                            #         st.session_state[f"confirm_delete_{key_suffix}"] = False
+                            #         st.rerun()
             else:
                 st.info("No recipes found.")
         except UIError as e:
