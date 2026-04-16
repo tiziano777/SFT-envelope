@@ -7,9 +7,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from streamlit_ui.api_client import HTTPXClient
-from streamlit_ui.errors import DeleteProtectionError, UIError
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.utils.errors import DeleteProtectionError, UIError
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +16,13 @@ logger = logging.getLogger(__name__)
 class ExperimentManager:
     """Manager for Experiment CRUD operations."""
 
-    def __init__(self, db_client: AsyncNeo4jClient, api_client: HTTPXClient):
+    def __init__(self, db_client: AsyncNeo4jClient):
         """Initialize ExperimentManager.
 
         Args:
             db_client: AsyncNeo4jClient for Neo4j queries.
-            api_client: HTTPXClient for Master API calls.
         """
         self.db = db_client
-        self.api = api_client
 
     async def create_experiment(
         self,

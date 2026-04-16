@@ -8,8 +8,8 @@ import logging
 import streamlit as st
 
 from streamlit_ui.crud.component_manager import ComponentManager
-from streamlit_ui.errors import DeleteProtectionError, UIError
-from streamlit_ui.utils import get_api_client, get_neo4j_client
+from streamlit_ui.utils.errors import DeleteProtectionError, UIError
+from streamlit_ui.utils import get_neo4j_client
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,7 @@ async def create_component_async(
 ) -> dict:
     """Create component asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ComponentManager(db_client, api_client)
+    manager = ComponentManager(db_client)
     return await manager.create_component(
         opt_code=opt_code,
         technique_code=technique_code,
@@ -34,40 +33,35 @@ async def create_component_async(
 async def list_components_async() -> list[dict]:
     """List components asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ComponentManager(db_client, api_client)
+    manager = ComponentManager(db_client)
     return await manager.list_components()
 
 
 async def get_component_async(comp_id: str) -> dict:
     """Get component asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ComponentManager(db_client, api_client)
+    manager = ComponentManager(db_client)
     return await manager.get_component(comp_id)
 
 
 async def update_component_async(comp_id: str, docs_url: str, description: str) -> None:
     """Update component asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ComponentManager(db_client, api_client)
+    manager = ComponentManager(db_client)
     await manager.update_component(comp_id, docs_url=docs_url, description=description)
 
 
 async def check_component_deps_async(comp_id: str) -> int:
     """Check component dependencies asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ComponentManager(db_client, api_client)
+    manager = ComponentManager(db_client)
     return await manager.check_component_dependencies(comp_id)
 
 
 async def delete_component_async(comp_id: str) -> None:
     """Delete component asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ComponentManager(db_client, api_client)
+    manager = ComponentManager(db_client)
     await manager.delete_component(comp_id)
 
 

@@ -8,8 +8,8 @@ import logging
 import streamlit as st
 
 from streamlit_ui.crud.experiment_manager import ExperimentManager
-from streamlit_ui.errors import DeleteProtectionError, UIError
-from streamlit_ui.utils import get_api_client, get_neo4j_client
+from streamlit_ui.utils.errors import UIError
+from streamlit_ui.utils import get_neo4j_client
 
 logger = logging.getLogger(__name__)
 
@@ -18,24 +18,21 @@ logger = logging.getLogger(__name__)
 async def create_experiment_async(model_id: str, status: str, description: str) -> dict:
     """Create experiment asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ExperimentManager(db_client, api_client)
+    manager = ExperimentManager(db_client)
     return await manager.create_experiment(model_id=model_id, status=status, description=description)
 
 
 async def list_experiments_async(status: str | None = None) -> list[dict]:
     """List experiments asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ExperimentManager(db_client, api_client)
+    manager = ExperimentManager(db_client)
     return await manager.list_experiments(status=status)
 
 
 async def get_experiment_async(exp_id: str) -> dict:
     """Get experiment asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ExperimentManager(db_client, api_client)
+    manager = ExperimentManager(db_client)
     return await manager.get_experiment(exp_id)
 
 
@@ -44,8 +41,7 @@ async def update_experiment_async(
 ) -> dict:
     """Update experiment asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ExperimentManager(db_client, api_client)
+    manager = ExperimentManager(db_client)
     return await manager.update_experiment(
         exp_id, status=status, description=description, exit_status=exit_status, exit_msg=exit_msg
     )

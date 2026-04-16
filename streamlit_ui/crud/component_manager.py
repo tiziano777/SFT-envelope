@@ -7,9 +7,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from streamlit_ui.api_client import HTTPXClient
-from streamlit_ui.errors import DeleteProtectionError, UIError
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.utils.errors import DeleteProtectionError, UIError
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +16,13 @@ logger = logging.getLogger(__name__)
 class ComponentManager:
     """Manager for Component CRUD operations."""
 
-    def __init__(self, db_client: AsyncNeo4jClient, api_client: HTTPXClient):
+    def __init__(self, db_client: AsyncNeo4jClient):
         """Initialize ComponentManager.
 
         Args:
             db_client: AsyncNeo4jClient for Neo4j queries.
-            api_client: HTTPXClient for Master API calls.
         """
         self.db = db_client
-        self.api = api_client
 
     async def create_component(
         self,
@@ -188,3 +185,16 @@ class ComponentManager:
             Number of dependent relationships.
         """
         return await self.db.count_relationships(component_id, "Component")
+
+    async def is_component_deletable(self, component_id: str) -> bool:
+        """Check if component can be deleted (no related experiments).
+
+        Args:
+            component_id: Component ID to check.
+
+        Returns:
+            True if component has no related experiments, False otherwise.
+        """
+        from streamlit_ui.crud.repository.component_repository import ComponentRepository
+        repo = ComponentRepository(self.db)
+        return await repo.is_deletable(component_id)

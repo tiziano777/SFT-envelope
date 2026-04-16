@@ -7,9 +7,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from streamlit_ui.api_client import HTTPXClient
-from streamlit_ui.errors import DeleteProtectionError, UIError
-from streamlit_ui.neo4j_async import AsyncNeo4jClient
+from streamlit_ui.utils.errors import DeleteProtectionError, UIError
+from streamlit_ui.db.neo4j_async import AsyncNeo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +16,13 @@ logger = logging.getLogger(__name__)
 class ModelManager:
     """Manager for Model CRUD operations."""
 
-    def __init__(self, db_client: AsyncNeo4jClient, api_client: HTTPXClient):
+    def __init__(self, db_client: AsyncNeo4jClient):
         """Initialize ModelManager.
 
         Args:
             db_client: AsyncNeo4jClient for Neo4j queries.
-            api_client: HTTPXClient for Master API calls.
         """
         self.db = db_client
-        self.api = api_client
 
     async def create_model(
         self,
@@ -203,3 +200,16 @@ class ModelManager:
             Number of dependent relationships.
         """
         return await self.db.count_relationships(model_id, "Model")
+
+    async def is_model_deletable(self, model_id: str) -> bool:
+        """Check if model can be deleted (no related experiments).
+
+        Args:
+            model_id: Model ID to check.
+
+        Returns:
+            True if model has no related experiments, False otherwise.
+        """
+        from streamlit_ui.crud.repository.model_repository import ModelRepository
+        repo = ModelRepository(self.db)
+        return await repo.is_deletable(model_id)

@@ -8,8 +8,8 @@ import logging
 import streamlit as st
 
 from streamlit_ui.crud.model_manager import ModelManager
-from streamlit_ui.errors import DeleteProtectionError, UIError
-from streamlit_ui.utils import get_api_client, get_neo4j_client
+from streamlit_ui.utils.errors import DeleteProtectionError, UIError
+from streamlit_ui.utils import get_neo4j_client
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,7 @@ async def create_model_async(
 ) -> dict:
     """Create model asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ModelManager(db_client, api_client)
+    manager = ModelManager(db_client)
     return await manager.create_model(
         model_name=model_name,
         version=version,
@@ -34,16 +33,14 @@ async def create_model_async(
 async def list_models_async() -> list[dict]:
     """List models asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ModelManager(db_client, api_client)
+    manager = ModelManager(db_client)
     return await manager.list_models()
 
 
 async def get_model_async(model_id: str) -> dict:
     """Get model asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ModelManager(db_client, api_client)
+    manager = ModelManager(db_client)
     return await manager.get_model(model_id)
 
 
@@ -52,8 +49,7 @@ async def update_model_async(
 ) -> None:
     """Update model asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ModelManager(db_client, api_client)
+    manager = ModelManager(db_client)
     await manager.update_model(
         model_id, version=version, url=url, doc_url=doc_url, description=description
     )
@@ -62,16 +58,14 @@ async def update_model_async(
 async def check_model_deps_async(model_id: str) -> int:
     """Check model dependencies asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ModelManager(db_client, api_client)
+    manager = ModelManager(db_client)
     return await manager.check_model_dependencies(model_id)
 
 
 async def delete_model_async(model_id: str) -> None:
     """Delete model asynchronously."""
     db_client = get_neo4j_client()
-    api_client = get_api_client()
-    manager = ModelManager(db_client, api_client)
+    manager = ModelManager(db_client)
     await manager.delete_model(model_id)
 
 
