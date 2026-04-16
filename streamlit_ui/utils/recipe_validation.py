@@ -36,7 +36,7 @@ def validate_recipe_yaml(yaml_str: str) -> tuple[bool, Optional[Recipe], list[st
             raise ValueError("YAML must contain top-level 'entries' mapping of dataset URIs to metadata")
 
         # Extract recipe metadata (all optional at YAML load time)
-        yaml_recipe_id = data.get("recipe_id")
+        yaml_recipe_id = data.get("id")
         yaml_name = data.get("name")
         yaml_description = data.get("description")
         yaml_scope = data.get("scope")
@@ -45,16 +45,20 @@ def validate_recipe_yaml(yaml_str: str) -> tuple[bool, Optional[Recipe], list[st
         yaml_derived_from = data.get("derived_from")
 
         # Create Recipe entity to validate entries structure
-        recipe = Recipe(
-            id=yaml_recipe_id,
-            name=yaml_name,
-            description=yaml_description,
-            scope=yaml_scope,
-            tasks=yaml_tasks,
-            tags=yaml_tags,
-            derived_from=yaml_derived_from,
-            entries=entries_data
-        )
+        # Note: Don't pass id if None — let BaseEntity default_factory generate UUID
+        recipe_kwargs = {
+            "name": yaml_name,
+            "description": yaml_description,
+            "scope": yaml_scope,
+            "tasks": yaml_tasks,
+            "tags": yaml_tags,
+            "derived_from": yaml_derived_from,
+            "entries": entries_data
+        }
+        if yaml_recipe_id is not None:
+            recipe_kwargs["id"] = yaml_recipe_id
+
+        recipe = Recipe(**recipe_kwargs)
 
         entries_count = len(recipe.entries)
         logger.info(
