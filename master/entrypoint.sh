@@ -5,7 +5,7 @@ echo "Starting Master API entrypoint..."
 
 # Initialize Neo4j schema (idempotent)
 echo "Initializing Neo4j schema..."
-python3 master/neo4j/init_schema.py
+python3 -m neo4j_client.init_schema
 
 if [ $? -ne 0 ]; then
     echo "Schema initialization failed, but continuing (schema may already be initialized)"
