@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml .
 COPY master/ master/
 COPY envelope/ envelope/
+COPY neo4j_client/ neo4j_client/
 
 # Install dependencies
 RUN pip install --no-cache-dir -q -e ".[master]"
