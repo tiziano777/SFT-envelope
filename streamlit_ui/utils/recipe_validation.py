@@ -40,7 +40,7 @@ def validate_recipe_yaml(yaml_str: str) -> tuple[bool, Optional[Recipe], list[st
         yaml_name = data.get("name")
         yaml_description = data.get("description")
         yaml_scope = data.get("scope")
-        yaml_tasks = data.get("task") or data.get("tasks", [])  # Support both singular and plural
+        yaml_tasks = data.get("tasks") or data.get("tasks", [])  # Support both singular and plural
         yaml_tags = data.get("tags", [])
         yaml_derived_from = data.get("derived_from")
 

@@ -6,10 +6,9 @@ OTEL auto-instrumented FastAPI service with manual spans on critical endpoints
 
 from __future__ import annotations
 
-import asyncio
+
 import inspect
 import logging
-import uuid
 from contextlib import contextmanager
 from typing import Any, Generator
 
@@ -35,7 +34,7 @@ from master.errors import (
     MasterAPIError,
     ValidationError,
 )
-from master.neo4j.client import Neo4jClient
+from neo4j_client.client import Neo4jClient
 from master.observability.tracing import get_tracer, setup_tracing
 from master.storage.resolver import URIResolver
 

@@ -153,7 +153,8 @@ def run() -> None:
                             st.write(f"**Scope:** {recipe.get('scope', 'N/A')}")
                             st.write(f"**Tasks:** {', '.join(recipe.get('tasks', []))}")
                             st.write(f"**Tags:** {', '.join(recipe.get('tags', []))}")
-                            
+                            st.write(f"**Derived from:** {recipe.get('derived_from', 'N/A')}")
+
                             st.caption(f"Created: {recipe.get('created_at', 'N/A')}")
                             st.caption(f"Updated: {recipe.get('updated_at', 'N/A')}")
 
@@ -177,7 +178,7 @@ def run() -> None:
                                             st.write(f"**tokens:** {entry.get('tokens', 'N/A')}")
                                             st.write(f"**words:** {entry.get('words', 'N/A')}")
                                             st.write(f"**system_prompt_name:** {entry.get('system_prompt_name', [])}")
-                                            st.write(f"**system_prompt:** {entry.get('system_prompt', [])}")
+                                            st.write(f"**system_prompt:** {[e[:150] for e in entry.get('system_prompt', [])]}")
                                         # schema_template and validation_error may be large structures
                                         if entry.get('schema_template'):
                                             st.caption("schema_template:")

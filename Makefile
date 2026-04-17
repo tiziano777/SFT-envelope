@@ -1,5 +1,20 @@
 .PHONY: help master-up master-down master-logs master-test master-shell master-reset neo4j-shell streamlit-up streamlit-down streamlit-logs streamlit-shell stack-up stack-down health-check
 
+streamlit-ui:
+	@echo "🚀 Starting Streamlit UI..."
+	docker-compose up -d streamlit
+	@echo "✅ Streamlit started on http://localhost:8501"
+
+streamlit-rebuild:
+	@echo "🔨 Rebuilding Streamlit UI..."
+	docker-compose build streamlit && docker-compose up -d streamlit
+	@echo "✅ Streamlit rebuilt"
+
+streamlit-rollback:
+	@echo "⏪ Rolling back Streamlit UI to previous image..."
+	docker-compose down -v streamlit && docker-compose build streamlit &&  docker-compose up -d streamlit
+	@echo "✅ Streamlit rolled back to latest image"
+
 help:
 	@echo "FineTuning-Envelope Lineage System — Master Infrastructure"
 	@echo ""

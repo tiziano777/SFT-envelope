@@ -33,7 +33,7 @@ async def ensure_schema_initialized() -> None:
             "03-seeds.cypher",
         ]
 
-        base_path = Path(__file__).parent.parent / "master" / "neo4j"
+        base_path = Path(__file__).parent.parent  / "neo4j_client"
 
         for schema_file_name in schema_files:
             schema_file = base_path / schema_file_name
