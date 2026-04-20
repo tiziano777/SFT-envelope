@@ -1,0 +1,7 @@
+# Core dependencies for envelope setup generation system
+click==8.1.7
+jinja2==3.1.2
+pydantic==2.5.0
+pyyaml==6.0.1
+rich==13.7.0
+wheel==0.42.0
