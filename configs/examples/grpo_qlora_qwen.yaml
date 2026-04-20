@@ -1,0 +1,35 @@
+experiment:
+  name: grpo-qlora-qwen
+  description: GRPO with QLoRA on Qwen2
+  seed: 42
+
+model:
+  name_or_path: Qwen/Qwen2-1.5B-Instruct
+  max_seq_length: 2048
+
+training:
+  technique: grpo
+  peft:
+    method: qlora
+    r: 16
+    lora_alpha: 32
+  precision:
+    compute_dtype: bf16
+    quantization: nf4
+
+dataset:
+  train_uri: trl-internal-testing/rl-prompt-only
+  split_train: train
+  format: rl
+
+reward:
+  type: verifiable
+
+framework:
+  backend: trl
+  version: "0.12.0"
+
+output:
+  dir: ./output
+  logging_steps: 10
+  save_steps: 500

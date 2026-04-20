@@ -1,0 +1,32 @@
+experiment:
+  name: sft-baseline
+  description: Simple SFT baseline on Qwen
+  seed: 42
+
+model:
+  name_or_path: Qwen/Qwen2-1.5B-Instruct
+  max_seq_length: 2048
+
+training:
+  technique: sft
+  peft:
+    method: lora
+    r: 16
+    lora_alpha: 32
+  precision:
+    compute_dtype: bf16
+    quantization: none
+
+dataset:
+  train_uri: HuggingFaceH4/ultrachat_200k
+  split_train: train
+  format: chat
+
+framework:
+  backend: trl
+  version: "0.12.0"
+
+output:
+  dir: ./output
+  logging_steps: 10
+  save_steps: 500
