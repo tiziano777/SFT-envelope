@@ -1,130 +1,138 @@
-# ROADMAP: FineTuning-Envelope Recovery
+# v0.2 Recovery Roadmap
 
-**Updated**: 2026-04-20
-**Milestone**: Recovery v0.1
-**Total Phases**: 4 + Archive
+**Goal**: Fix broken scaffold generator post-export. Simplify via KISS. Make `make setup` work end-to-end.
 
----
-
-## Phase 1: Audit & Cleanup (Foundational)
-
-**Goal**: Stabilize codebase, fix tooling, identify real dead code
-
-**User Stories**:
-1. Generate requirements.txt from live codebase imports → R-BUILD-1
-2. Audit "dead code" report, classify plugins vs. garbage → R-QA-1
-3. Create Makefile (install, test, lint, clean) → R-BUILD-2
-4. Fix .gitignore for cache/output/venv → R-BUILD-3
-5. Verify CLI works: all subcommands execute → implicit
-
-**Acceptance**:
-- `make install` succeeds
-- `make test` runs (may fail — OK, documents gaps)
-- `make lint` passes or lists non-blocking issues
-- requirements.txt pins correctly
-- Dead code report reviewed + false positives removed
-
-**Depends**: (none — starting phase)
-
-**Estimate**: 2–3 hours (caveman)
+**Timeline**: < 2 weeks, iterative. Quality > perfection.
 
 ---
 
-## Phase 2: Scaffold Standardization (Core)
+## Phase 1: Make Scaffold Foundation
+**Depends**: None
+**Goal**: Fix `make setup NAME=X CONFIG=Y` to generate functioning scaffold
+**Status**: ✅ COMPLETE (45 min)
+**Plans**: 1 plan
+- [x] 01-01-PLAN.md — Populate requirements.txt, create example configs, write E2E tests, verify Makefile
 
-**Goal**: Generate complete, runnable experiment folders
+**Scope**:
+- Fix/create Makefile with `setup`, `validate`, `test-scaffold` targets
+- Audit `pyproject.toml` dependencies (pin versions, verify completeness)
+- Fix empty `requirements.txt` → consolidate all deps
+- Verify `setup_generator.py` orchestration logic works with templates
+- Test: Generate 1 real setup_grpo-test/, inspect all generated files
 
-**User Stories**:
-1. Create train.py template → R-SCAFFOLD-1
-2. Create prepare.py template → R-SCAFFOLD-2
-3. Ensure config.yml is 100% source of truth → R-SCAFFOLD-3
-4. Standardize modules/ structure → R-SCAFFOLD-4
-5. Update setup_generator to produce standard file list → R-SCAFFOLD-5
-6. Test: generate setup for SFT + TRL, verify file list
+**UAT**:
+- [x] `make setup NAME=grpo-test CONFIG=examples/grpo_qlora_qwen.yaml` succeeds
+- [x] setup_grpo-test/ contains: prepare.py, train.py, config.yaml, requirements.txt, modules/
+- [x] All files syntactically valid Python/YAML
+- [x] CLI commands work: `envelope setup`, `envelope validate`, `envelope compatible`
 
-**Acceptance**:
-- `envelope setup --name test_sft --config examples/sft_config.yml` produces setup_test_sft/
-- Setup folder contains: requirements.txt, config.yml (copy), train.py, prepare.py, run.sh, modules/, .cache/ (if prepare ran)
-- `bash setup_test_sft/run.sh` executes without errors (may not train fully, OK — just verify script structure)
-- config.yml read correctly, no hardcoded values in train.py
-
-**Depends**: Phase 1 ✓
-
-**Estimate**: 3–4 hours (caveman)
-
----
-
-## Phase 3: SkyPilot Integration (Infrastructure)
-
-**Goal**: Auto-provision cloud HW if requested
-
-**User Stories**:
-1. Replace auto_optimizer hardcoded logic with sky.yaml generator → R-HW-1
-2. Add cloud provider cost/availability suggestions → R-HW-2
-3. Integrate SkyPilot (optional dep — graceful fallback)
-4. Document hardware config workflow
-5. Test: generate sky.yaml for A100 × 4 setup
-
-**Acceptance**:
-- `envelope validate --config cfg.yml --remote` suggests HW + generates sky.yaml
-- `sky launch sky.yaml` works (if SkyPilot available)
-- Fallback: if SkyPilot not installed, suggests config but doesn't fail
-- Config HW section fully respected (GPU type, count, CPU per GPU, etc)
-
-**Depends**: Phase 2 ✓
-
-**Estimate**: 2–3 hours (caveman)
+**Artifacts**: requirements.txt (6 pinned deps), configs/examples/{sft_baseline.yaml, grpo_qlora_qwen.yaml}, tests/test_setup_generator.py
 
 ---
 
-## Phase 4: Docs & Complexity Reduction (Polish)
+## Phase 2: Config Resolution Refactor (YAML-only)
+**Depends**: Phase 1
+**Goal**: Kill redundant merging. Hyperparams live in config.yml only, not Python code.
+**Status**: 📋 PLANNED (7 tasks across 3 waves)
+**Plans**: 1 plan
+- [ ] 02-01-PLAN.md — Move defaults to schema, consolidate recipe, unify resolve_hyperparams, make diagnostics optional, generate complete config.yaml
 
-**Goal**: Clean documentation, assess simplification opportunities
+**Scope**:
+- Move hyperparameter defaults from loader injection → Pydantic Field defaults
+- Consolidate recipe schema (RecipeConfig as canonical, remove DatamixConfig duplication)
+- Unify resolve_hyperparams() — remove template duplication, single implementation in shared_utils
+- Add diagnostics field to EnvelopeConfig (optional, configurable in YAML)
+- Remove merge_technique_defaults() load-time injection
+- Generate complete config.yaml with exclude_defaults=False
+- Integration tests: verify config completeness + regenerability
 
-**User Stories**:
-1. Create/update workflow.md (end-to-end process) → R-DOC-1
-2. Auto-generate README.md in each setup folder → R-DOC-2
-3. Update root README → R-DOC-3
-4. Audit from_scratch/ framework usage → R-SIMPLIFY-1
-5. Config validation test coverage audit → R-QA-3
-6. Final integration test: full pipeline SFT+TRL → setup → execute snippet
+**Wave Structure**:
+- **Wave 1** (2 tasks): Schema consolidation (Field defaults, recipe schema)
+- **Wave 2** (3 tasks): Unification (remove injection, add diagnostics, unify resolve_hyperparams)
+- **Wave 3** (2 tasks): Generation + verification (complete config.yaml, integration tests)
 
-**Acceptance**:
-- workflow.md complete (all config fields documented)
-- Generated setup folder includes README with instructions
-- from_scratch/ assessment documented (decision: keep/deprecate/remove)
-- Linting + tests still pass
-- Example workflow runs end-to-end (or documents why not)
+**UAT**:
+- [ ] Generated config.yaml contains ALL fields (hparam_overrides, technique_args, diagnostics)
+- [ ] Regenerating from generated config.yaml produces identical file (reproducible)
+- [ ] resolve_hyperparams() exists only in shared_utils.py (removed from templates)
+- [ ] RecipeConfig is canonical; no DatamixConfig duplication
+- [ ] Diagnostics optional + configurable in config.yaml
+- [ ] Phase 1 tests still pass (no breaking changes to scaffold generation)
+- [ ] pytest tests/test_config_resolution.py -v (all green)
 
-**Depends**: Phase 3 ✓
-
-**Estimate**: 2–3 hours (caveman)
-
----
-
-## Archive: Completed Recovery
-
-**Goal**: Finalize recovery, prepare for v0.1 release
-
-**Tasks**:
-- [ ] All phases execute
-- [ ] All tests pass (pytest + ruff)
-- [ ] Git log clean (1 commit per phase + follow-ups)
-- [ ] README + workflow.md finalized
-- [ ] Tag v0.1-recovery in git
-- [ ] Update PROJECT.md with completion date
+**Risk Mitigation**:
+- Backward compat: hparam_overrides and diagnostics have sensible defaults
+- Recipe consolidation: use aliases if needed to prevent import breaks
+- Regeneration test catches any issues with incomplete config.yaml
 
 ---
 
-## Summary Table
+## Phase 3: Complexity Audit & Simplification (KISS)
+**Depends**: Phase 2
+**Goal**: Reduce overcomplicated flows. Keep simple + reliable code untouched.
+**Status**: ⏳ PENDING Phase 2
+**Scope**:
+- List all "overcomplicated" classes (>50 lines, multiple responsibilities): adapters with custom framework logic, recipe loaders, diagnostics
+- For each: decide KEEP (working), REFACTOR (simplify), REMOVE (dead)
+- Remove duplicate recipe/dataset resolution (model.py + prepare/ redundancy)
+- Simplify diagnostics injection — TRLDiagnosticCallback should be pluggable, not auto-injected
+- Verify no-touch zones (registry.py, base.py, simple adapters) unchanged
+- Delete truly dead code (enums used via config validation are NOT dead — mark as verified)
 
-| Phase | Goal | Key Deliverable | Duration | Depends On |
-|-------|------|---|---|---|
-| 1 | Foundational | requirements.txt, Makefile, .gitignore | 2–3h | — |
-| 2 | Core | train.py, prepare.py templates, setup folder structure | 3–4h | Ph1 |
-| 3 | Infra | SkyPilot integration, HW provisioning | 2–3h | Ph2 |
-| 4 | Polish | workflow.md, docs, complexity audit | 2–3h | Ph3 |
-| Archive | Release | v0.1-recovery tag | — | Ph4 |
+**UAT**:
+- [ ] No class > 100 lines (consolidate methods or split responsibility)
+- [ ] Recipe config defined in ONE place only
+- [ ] Diagnostics callback is optional, user-configurable in config.yml
+- [ ] All 11 communities in graph have clear, single purpose
 
-**Total: ~10–13 hours (caveman mode, parallel where possible)**
+**Risks**: Accidental deletion of used code (run tests after each removal)
 
+---
+
+## Phase 4: Validation & Cleanup
+**Depends**: Phase 3
+**Goal**: Verify scaffold generation end-to-end. Document architecture. Commit polish.
+**Status**: ⏳ PENDING Phase 3
+**Scope**:
+- Full test: Generate 3 real setups (sft, dpo, grpo) with different frameworks (trl, unsloth, openrlhf)
+- Verify each setup runs `python prepare.py` + `python train.py --help` without errors
+- Update workflow.md to reflect new reality (if config format changed)
+- Audit dead code report — confirm all flagged symbols are either plugins or actual dead
+- Create simple CLI help: `envelope --help`, `make --help`
+- Git commit: atomic commits per phase with clear messages
+
+**UAT**:
+- [ ] 3 test scaffolds generated + validate passes
+- [ ] `prepare.py` runs without import errors
+- [ ] `train.py` loads config, doesn't crash on startup
+- [ ] Dead code report cleaned up (mark false positives as verified plugins)
+- [ ] Documentation reflects final architecture
+
+**Success Criteria**: `make setup` produces working, minimal setup. No feature creep. KISS maintained.
+
+---
+
+## Excluded / Backlog
+
+- **SkyPilot HW optimization** → v0.3 (depends on v0.2 foundation)
+- **New frameworks** → after refactor stabilizes
+- **Extended diagnostics** → post-recovery
+
+---
+
+## Git Strategy
+
+- 1 commit per phase (atomic, squashed from micro-commits)
+- Tag: `v0.2-recovery-phase-N` after each phase UAT passes
+- Branch: `feature/v0.2-recovery` for work, merge to main after Phase 4
+
+---
+
+## Phase Milestones
+
+| Phase | Goal | Tasks | Duration | Status |
+|-------|------|-------|----------|--------|
+| 1 | Foundation (make setup works) | 4 | ~45min | ✅ DONE |
+| 2 | Config refactor (single source of truth) | 7 | ~120min | 📋 PLANNING |
+| 3 | Simplify (KISS) | TBD | ~90min | ⏳ PENDING |
+| 4 | Validation (E2E) | TBD | ~60min | ⏳ PENDING |
