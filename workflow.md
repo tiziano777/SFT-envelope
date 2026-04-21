@@ -1,6 +1,6 @@
 # Workflow — FineTuning Envelope
 
-Guida step-by-step per generare setup di training: dall'installazione alla generazione e lancio di un esperimento.
+Guida step-by-step per generare setup di training
 
 Questo documento e' pensato per due tipi di utenti:
 
@@ -166,16 +166,16 @@ optimization:
 
 Tutti gli 8 framework sono supportati e generano setup funzionanti:
 
-| Framework | Tipo | Tecniche | Livello |
-|-----------|------|----------|--------|
-| **TRL** | Single-node | sft, dpo, grpo, ppo, gkd, distillation, reward_modeling | ✅ Completo |
-| **Unsloth** | Single-node | sft, dpo, grpo | ✅ Completo |
-| **Torchtune** | Single-node | sft, dpo | ✅ Completo |
-| **Axolotl** | Single-node | sft, dpo | ✅ Completo |
-| **veRL** | Multi-node | grpo, ppo, dapo, vapo | ✅ Completo |
-| **OpenRLHF** | Multi-node | sft, dpo, grpo, ppo | ✅ Completo |
-| **LlamaFactory** | Multi-node | sft, dpo, kto, orpo | ✅ Completo |
-| **From Scratch** | PyTorch raw | tutte le 19 tecniche | ✅ Completo |
+| Framework | Tipo | Tecniche | 
+|-----------|------|----------|
+| **TRL** | Single-node | sft, dpo, grpo, ppo, gkd, distillation, reward_modeling |
+| **Unsloth** | Single-node | sft, dpo, grpo | 
+| **Torchtune** | Single-node | sft, dpo | 
+| **Axolotl** | Single-node | sft, dpo | 
+| **veRL** | Multi-node | grpo, ppo, dapo, vapo | 
+| **OpenRLHF** | Multi-node | sft, dpo, grpo, ppo | 
+| **LlamaFactory** | Multi-node | sft, dpo, kto, orpo |
+| **From Scratch** | PyTorch raw | tutte le 19 tecniche | 
 
 Vedi `docs/frameworks.md` per dettagli su ogni backend.
 
@@ -196,30 +196,6 @@ cp examples/torchtune-sft.yaml configs/my_torchtune.yaml
 
 Ogni esempio è minimale ma completo, pronto per essere adattato.
 
----
-
-## FASE 3 — Valida il config
-
-```bash
-envelope validate --config configs/my_grpo_math.yaml
-```
-
-Il sistema verifica:
-
-1. Parsing YAML
-2. Merge dei default per la tecnica (es. `grpo` -> `num_generations=16`)
-3. Validazione Pydantic v2 (tipi, enum, vincoli di range)
-4. Cross-validation:
-   - QLoRA richiede quantizzazione? Presente.
-   - GPU supporta BF16? Solo se CC >= 8.0.
-   - Tecnica RL ha reward? Verifica.
-   - Framework supporta la tecnica? Verifica.
-5. Suggerimenti hardware (flash attention, gradient checkpointing)
-
-Correggi eventuali errori e ri-valida finche' tutto passa.
-
----
-
 ## FASE 4 — Genera il setup
 
 ```bash
@@ -232,19 +208,17 @@ Output generato:
 
 ```
 setups/setup_grpo-math-v1/
-├── prepare.py       # Preparazione dataset con caching idempotente
-├── train.py           # Script completo, contiene resolve_hparam() per env vars
-├── run.sh             # Script di lancio (python / accelerate launch / torchrun)
-├── config.yaml        # Config frozen (snapshot immutabile)
+├── prepare.py         # Preparazione dataset con caching in .cache/*
+├── train.py           # Script completo, legge da .cache/* e da config.yaml
+├── merge.py           # [opzionale] script epr fare ckp/model merging
+├── config.yaml        # Config file che tocca ogni aspetto del progetto, dagli hyperparameters all'HW
 ├── requirements.txt   # Dipendenze pip
-└── rewards/           # (solo per tecniche RL)
-    ├── __init__.py
-    └── math_verify.py
+└── modules/
+    ├── rewards/           # (solo per tecniche RL)
+    ├  ├── __init__.py
+    ├  └── math_verify.py
+    └── */
 ```
-
-**Importante**: questa directory e' **immutabile**. Non modificare mai i file al suo interno (eccezione: `data_cache/` viene creata a runtime da `prepare.py`).
-
-> **Per coding agents**: `train.py` contiene la funzione `resolve_hparam(name, default)` che legge `HPARAM_{NAME.upper()}` dalle env vars. Questo e' il meccanismo per sovrascrivere gli iperparametri a runtime senza toccare i file.
 
 ## FASE 5 — Training singolo (test manuale)
 
@@ -252,124 +226,8 @@ setups/setup_grpo-math-v1/
 cd setups/setup_grpo-math-v1
 pip install -r requirements.txt
 python prepare.py    # Scarica e cachea il dataset in ./data_cache/ (idempotente)
-bash run.sh          # train.py importa da prepare.py, non ri-scarica i dati
+bash train.py          # train.py importa da prepare.py, non ri-scarica i dati
 ```
-
-Lo script emette su stdout linee strutturate per tracciare i risultati:
-
-```
-EXPERIMENT_STATUS:STARTED
-EXPERIMENT_STATUS:TRAINING epoch=1 loss=2.341
-EXPERIMENT_RESULT:{"reward_mean": 0.72, "loss": 1.23, "accuracy": 0.85}
-EXPERIMENT_STATUS:COMPLETED
-```
-
-### Override manuali
-
-Sovrascrivere iperparametri senza modificare alcun file:
-
-```bash
-HPARAM_LEARNING_RATE=3e-5 HPARAM_PER_DEVICE_TRAIN_BATCH_SIZE=4 bash run.sh
-```
-
-Se va in OOM: riduci `num_generations`, `max_seq_length`, o aggiungi quantizzazione nel config YAML e ri-genera il setup dalla FASE 4.
-
-### Nuovo: hparam_overrides nel YAML
-
-A partire dalla refactoring di aprile 2026, puoi anche specificare overrides direttamente nel YAML config:
-
-```yaml
-experiment:
-  name: "my-experiment"
-
-# ... altre sezioni ...
-
-# Opzionale: sovrascrivi hyperparameter defaults nel YAML
-hparam_overrides:
-  learning_rate: 2e-4
-  per_device_train_batch_size: 8
-  num_epochs: 3
-```
-
-Al momento della generazione del setup, questi overrides vengono embeddati in `train.py` come default. Le env vars `HPARAM_*` continuano a sovrascrivere i valori nel config (stesso meccanismo di prima).
-
-**Precedenza** (dal più specifico al più generale):
-1. `HPARAM_*` env var → priorità massima
-2. `hparam_overrides` nel config YAML
-3. Framework defaults (TRL, Unsloth, etc.)
-4. Envelope defaults globali
-
----
-
-## Architettura: Worker-Master Async Pattern
-
-Il pattern Worker-Master define l'architettura complessiva del sistema di lineage tracking. Worker (GPU node) e Master (CPU node) comunicano asincronamente via HTTP per sincronizzare checkpoint, metriche, e cambiamenti di configurazione.
-
-### Spatial and Temporal Separation
-
-```
-┌─── GPU NODE (setup_{name}/) ────────────────────────────────────┐
-│                                                                    │
-│  run.sh (generated from run.sh.j2 template)                      │
-│  ├─ Start daemon: python -m worker.daemon                        │
-│  ├─ Wait: .handshake_done ← Master /handshake POST              │
-│  └─ Run: train.py (independent of daemon health)                 │
-│                                                                    │
-│  worker/daemon.py (Phase 6)                                      │
-│  ├─ [1] Handshake: POST /handshake → exp_id                      │
-│  ├─ [2] Watch: lineage/to_transfer/, training_metrics/          │
-│  ├─ [3] Queue: CheckpointPush, SyncEvent events                 │
-│  └─ [4] Async Push: exponential backoff retry                    │
-│                                                                    │
-│  Local persistence                                                │
-│  ├─ .worker_state.json (atomic state via tmp+rename)            │
-│  ├─ transfer_log.jsonl (append-only audit trail)                │
-│  └─ .handshake_done, .exp_id (markers)                           │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
-                             │
-                             │ HTTP/JSON
-                             ↓
-┌─── MASTER NODE ─────────────────────────────────────────────────┐
-│                                                                   │
-│  Master API (FastAPI, Phase 4)                                  │
-│  ├─ POST /handshake → strategy (NEW/RESUME/BRANCH/RETRY)        │
-│  ├─ POST /checkpoint_push → validate & store                    │
-│  ├─ POST /status_update → track lifecycle                       │
-│  ├─ POST /merge → combine checkpoints                           │
-│  └─ POST /sync_event → async event processing                   │
-│                                                                   │
-│  Master lineage store (Phase 2)                                  │
-│  ├─ Neo4j 5.x with 5 UNIQUE constraints                         │
-│  ├─ Node types: :Experiment, :Checkpoint, :Recipe, :Model      │
-│  ├─ Relations: DERIVED_FROM, RETRY_FROM, MERGED_FROM            │
-│  └─ APOC triggers: auto-timestamps, orphan validation            │
-│                                                                   │
-│  Observability (Phase 3)                                         │
-│  ├─ OpenTelemetry SDK                                            │
-│  ├─ FastAPI auto-instrumentation                                │
-│  └─ Phoenix UI for trace visualization                          │
-│                                                                   │
-└────────────────────────────────────────────────────────────────────┘
-
-Data Flow:
-├─ Worker: train.py writes checkpoint → daemon observes → queues event
-├─ Worker: daemon sends HTTP POST /checkpoint_push
-├─ Master: FastAPI receives → LineageController validates
-├─ Master: creates Neo4j Checkpoint node + relations
-├─ Master: returns 200 + checkpoint_id
-└─ Worker: daemon logs event to transfer_log.jsonl (audit trail)
-```
-
-### Key Design Properties
-
-**Decoupled**: Training proceeds unblocked even if daemon or Master unavailable. No blocking calls during train.py.
-
-**Async**: Checkpoint sync happens in background with exponential backoff retry. Worker doesn't wait for network round-trips.
-
-**Atomic**: Local state persisted via tmp+rename pattern (atomic on POSIX). transfer_log.jsonl is append-only for forensics.
-
-**Traceable**: Every event has event_id, timestamp, source for debugging and replay. Neo4j audit trail immutable.
 
 ---
 
@@ -397,16 +255,6 @@ In base ai risultati, le opzioni sono:
 | `envelope validate --config FILE` | Valida un config YAML |
 | `envelope setup --name NAME --config FILE` | Genera una directory setup |
 
-### Makefile shortcuts
-
-| Comando | Descrizione |
-|---------|-------------|
-| `make setup NAME=X CONFIG=Y` | Genera setup |
-| `make validate CONFIG=Y` | Valida config |
-| `make test` | Esegui test suite |
-| `make lint` | Linting con ruff |
-| `make format` | Formattazione con ruff |
-
 ---
 
 ## Riferimenti Ulteriori
@@ -419,4 +267,4 @@ In base ai risultati, le opzioni sono:
 - **Ottimizzazioni recenti**: `docs/optimization-notes.md` (refactoring april 2026)
 - **FSDP multi-GPU**: `docs/fsdp.md`
 - **Training from scratch**: `docs/from-scratch.md`
-- **3 example configs**: `examples/qlofa-sft.yaml`, `examples/distillation-gkd.yaml`, `examples/torchtune-sft.yaml`
+

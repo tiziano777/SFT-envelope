@@ -24,6 +24,9 @@ dataset:
 
 reward:
   type: verifiable
+  functions:
+    - name: accuracy_reward
+      module_path: rewards.accuracy
 
 framework:
   backend: trl

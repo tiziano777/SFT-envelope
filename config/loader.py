@@ -52,16 +52,17 @@ def merge_technique_defaults(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_config(path: str | Path) -> EnvelopeConfig:
-    """Load, merge defaults, and validate a YAML configuration.
+    """Load and validate a YAML configuration.
 
-    Returns a fully validated EnvelopeConfig instance.
+    Technique defaults are provided by schema validation (BaseTechnique.default_technique_args()
+    via Field defaults), not merged at load time. This ensures generated config.yaml is complete
+    and reproducible.
+
+    Returns:
+        Fully validated EnvelopeConfig instance.
     """
     raw = load_yaml(path)
-    raw = merge_technique_defaults(raw)
-
-    # Inject hparam defaults into the config dict
-    if "hparam_overrides" not in raw:
-        raw["hparam_overrides"] = dict(HYPERPARAMETER_DEFAULTS)
+    # No load-time injection: all defaults are now in schema Field defaults
 
     config = EnvelopeConfig.model_validate(raw)
     return config
@@ -86,11 +87,7 @@ def load_yaml_config(yaml_str: str) -> EnvelopeConfig:
     if not isinstance(data, dict):
         raise ValueError(f"Expected YAML dict, got {type(data).__name__}")
 
-    # Merge defaults and validate
-    data = merge_technique_defaults(data)
-    if "hparam_overrides" not in data:
-        data["hparam_overrides"] = dict(HYPERPARAMETER_DEFAULTS)
-
+    # No load-time injection: all defaults are in schema Field defaults
     config = EnvelopeConfig.model_validate(data)
     return config
 
@@ -125,7 +122,7 @@ def load_recipe_yaml(yaml_str: str) -> RecipeConfig:
 
 def dump_config(config: EnvelopeConfig, path: str | Path) -> None:
     """Serialize an EnvelopeConfig back to YAML."""
-    data = config.model_dump(mode="json", exclude_none=True)
+    data = config.model_dump(mode="json", exclude_defaults=False)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:

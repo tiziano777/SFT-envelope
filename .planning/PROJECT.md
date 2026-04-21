@@ -1,125 +1,167 @@
-# FineTuning-Envelope: Recovery & Infrastructure
+# FineTuning Envelope — Project Context
 
-**Status**: Exported codebase → Recovery phase
-**Date started**: 2026-04-20
-**Goal**: Stabilize + standardize experiment generation system for LLM fine-tuning
+## Project Summary
 
----
+**Envelope** is a zero-config setup generator for reproducible LLM fine-tuning experiments. Reads a YAML config specifying model, technique, dataset, and hardware → generates a self-contained `setup_NAME/` directory with all code + dependencies to run training.
 
-## Context
-
-### What This Is
-FineTuning-Envelope = two-level experiment generator for reproducible LLM fine-tuning setups.
-- Level 1: YAML config (`config.yml`) → defines entire experiment
-- Level 2: Setup folder (`setup_{name}/`) → self-contained, runnable training environment
-
-### Why Recovery Needed
-- Codebase exported as standalone → missing `requirements.txt`, `Makefile`, template scaffolds
-- HW optimization hardcoded → needs SkyPilot integration for cloud provisioning
-- Prepare/train scripts not templated → scaffold generation incomplete
-- Diagnostics/registry working but undocumented
-
-### What Works Now
-✓ Plugin system (techniques, frameworks)
-✓ Pydantic config schema covering all training modes
-✓ Template generation via Jinja2
-✓ Cross-field config validation
-❌ No shell commands to run training
-❌ No cloud provisioning logic
-❌ Scaffold templates incomplete
+**Status**: v0.1 stable (19 techniques, 8 frameworks). v0.2 in recovery (post-export refactor).
 
 ---
 
-## Architecture (Current)
+## v0.1 Timeline (completed)
 
+| Date | Milestone | Notes |
+|------|-----------|-------|
+| 2025-Q4 | Initial design | 19 techniques (SFT, DPO, RL, etc), 8 frameworks (TRL, Unsloth, Axolotl, ...) |
+| 2026-02 | Framework matrix | Capability matrix, compatibility checks |
+| 2026-03 | Setup generator | Jinja2 templates, config loader, generate setup_*/ |
+| 2026-04 | Export to single repo | Codebase extracted from monorepo, lost some integration |
+
+---
+
+## v0.2 Goals
+
+**Recovery & Refactor** — restore functionality post-export, simplify via KISS.
+
+### Guiding Principles
+
+1. **KISS (Keep It Simple, Stupid)**
+   - No feature creep. Scaffold generation must be minimal but complete.
+   - No speculative abstractions. One responsibility per class.
+   - Dead code audit + cleanup (but preserve working plugins).
+
+2. **Single Source of Truth**
+   - Config.yml contains ALL hyperparameters, dataset specs, HW config.
+   - No runtime discovery, no "fallback" merging in Python code.
+   - Framework adapters read from config, don't patch it.
+
+3. **Leave Working Code Alone**
+   - Registry system, base classes, simple adapters → no changes.
+   - Only refactor obviously overcomplicated flows.
+   - Confirm before deleting anything.
+
+4. **Reproducibility**
+   - Generated setups must work end-to-end (prepare → train).
+   - Config.yml = provenance. Pin all deps. Cache data.
+   - No hidden dependencies or machine-specific logic.
+
+---
+
+## v0.2 Structure
+
+**4 Phases** (fast-track refactor):
+
+1. **Phase 1**: Make Scaffold Foundation
+   - Fix Makefile, requirements.txt, pyproject.toml
+   - Test setup generation end-to-end
+   - Verify templates render correctly
+
+2. **Phase 2**: Config Resolution Refactor
+   - Remove redundant config merging (`resolve_hyperparams()`)
+   - Consolidate recipe/dataset config (one source, not two)
+   - Verify config.yml as single source of truth
+
+3. **Phase 3**: Complexity Audit & Simplification (KISS)
+   - Identify overcomplicated classes/flows
+   - Simplify (split, consolidate, remove)
+   - Dead code + false positive audit
+
+4. **Phase 4**: Validation & Cleanup
+   - Test 3 real scaffolds (sft, dpo, grpo)
+   - Verify prepare.py + train.py work
+   - Update documentation, atomic commits
+
+---
+
+## Architecture (v0.1 stable)
+
+### Core Layers
+
+| Layer | Purpose | Key Files |
+|-------|---------|-----------|
+| **Config** | YAML parsing, Pydantic models | `config/models.py`, `config/loader.py` |
+| **Registry** | Plugin system (techniques, frameworks) | `registry/base.py`, decorators |
+| **Techniques** | 19 training methods | `techniques/sft/`, `techniques/rl/`, etc. |
+| **Frameworks** | 8 backend adapters | `frameworks/single_node/`, `frameworks/multi_node/` |
+| **Generation** | Template rendering, scaffold creation | `generators/setup_generator.py` |
+| **Prepare** | Dataset loading, caching | `prepare/datamix_loader.py` |
+
+### Communities (11 detected)
+
+1. **frameworks** — all backend adapters + capability matrix
+2. **rl-technique** — RL-specific techniques (GRPO, PPO, etc.)
+3. **config-config** — Pydantic models, schema, validation
+4. **diagnostics** — runtime logging (TRL callback injection)
+5. **from_scratch** — PyTorch raw implementation (kernels, trainers)
+6. **prepare** — data loading, caching
+7. **sft** — supervised fine-tuning
+8. **preference** — preference optimization (DPO, KTO, etc.)
+9. **distillation** — model distillation (GKD, etc.)
+10. **merge** — model merging
+11. **reward** — reward modeling
+
+---
+
+## Known Issues (v0.1 → v0.2)
+
+### Issue 1: Export Broke Integration
+- Makefile missing
+- requirements.txt empty (deps in pyproject.toml)
+- setup_generator not wired to CLI
+- Templates possibly missing/untested
+
+### Issue 2: Redundant Config
+- Recipe/dataset config in BOTH: `config/models.py` AND `prepare/datamix_loader.py`
+- Hyperparameters resolved at runtime via `shared_utils.py:resolve_hyperparams()`
+- Should be: single config.yml file, schema validation, no runtime merging
+
+### Issue 3: Dead Code
+- 218 symbols flagged as unused
+- FALSE POSITIVES: 95% are plugins/enums used via dynamic registration
+- TRUE DEAD: diagnostics callback, some prepare/ functions
+
+### Issue 4: Complexity Creep
+- Some adapters over-engineered (>100 lines, multiple responsibilities)
+- Diagnostics auto-injected (should be optional)
+- No clear separation between "generator config" and "runtime config"
+
+---
+
+## Dependencies (external)
+
+```toml
+python = "^3.10"
+pydantic = "^2.0"
+click = "^8.0"
+rich = "^13.0"
+jinja2 = "^3.0"
+pyyaml = "^6.0"
+transformers = "^4.40"
+torch = "^2.1"
 ```
-envelope/
-├── config/          # Pydantic models + YAML loader + validators
-├── techniques/      # @registry plugins (SFT, DPO, PPO, etc)
-├── frameworks/      # Adapter pattern for TRL, Unsloth, Axolotl, etc
-├── hardware/        # GPU specs, auto_optimizer (hardcoded)
-├── prepare/         # Data prep (datamix_loader exists, recipe partial)
-├── generators/      # setup_generator orchestrates template rendering
-├── rewards/         # Custom reward function stubs
-├── diagnostics/     # TRL callbacks + runtime monitoring
-├── registry/        # Plugin registration system
-├── cli.py           # Click CLI (setup, validate, techniques, frameworks)
-└── .venv/           # Virtual env (present locally)
-```
 
 ---
 
-## Success Criteria (Recovery Complete)
+## Team & Scope
 
-1. **Buildability**: `make install && make test` passes
-2. **CLI**: `envelope setup --name exp1 --config config.yml` generates working setup folder
-3. **Setup scaffold standard**:
-   - `requirements.txt` (tech + framework specific)
-   - `config.yml` (copy of input, no logic needed)
-   - `prepare.py` (loads data per config → .cache/)
-   - `train.py` (runs training per config)
-   - `modules/` (custom rewards, adapters if needed)
-   - `.cache/` + `.env` (ignored)
-4. **HW optimization**: Auto-suggest GPU configs via SkyPilot
-5. **Docs**: workflow.md explains end-to-end process
-6. **Zero runtime hparam resolution**: All hyperparams in config.yml, no env var magic
+- **Owner**: T. Finizzi
+- **Team**: Solo (AI-assisted)
+- **Duration**: < 2 weeks
+- **Focus**: Quality refactor, not feature additions
 
 ---
 
-## Gaps vs. Goals
+## Versioning
 
-| Gap | Impact | Recovery Phase |
-|-----|--------|---|
-| No requirements.txt | Can't run envelope CLI | 1: Audit & Fix |
-| No Makefile | No standard dev commands | 1: Audit & Fix |
-| Incomplete train.py template | Can't execute training | 2: Scaffold Standardization |
-| Incomplete prepare.py template | Data never reaches training | 2: Scaffold Standardization |
-| auto_optimizer hardcoded | No cloud cost/availability logic | 3: SkyPilot Integration |
-| Diagnostics undocumented | Uncertain if TRLCallback injected correctly | 1: Audit & Fix |
-| Hyperparams resolved at runtime | Config.yml incomplete, env vars leak logic | 2: Scaffold Standardization |
+- **v0.1**: Stable. 19 techniques, 8 frameworks.
+- **v0.2**: Recovery & KISS simplification (this milestone).
+- **v0.3**: SkyPilot HW optimization (planned, post-v0.2).
 
 ---
 
-## Recovery Phases (4-phase plan)
+## References
 
-### Phase 1: Audit & Cleanup (foundational)
-- Identify real dead code vs. @registry plugins
-- Generate requirements.txt from graph imports
-- Create Makefile (test, lint, install, setup)
-- Fix .gitignore (exclude .cache/, output/)
+- **Workflow**: `workflow.md` (step-by-step usage guide)
+- **CLAUDE.md**: Project conventions (KISS, TDD, modularity)
+- **Docs**: `docs/architecture.md`, `docs/config.md`, `docs/techniques.md`, `docs/frameworks.md`
 
-### Phase 2: Scaffold Standardization
-- Create train.py template (config-driven, no hardcode)
-- Create prepare.py template (recipe → .cache/)
-- Document config.yml schema expectations
-- Standardize modules/* structure (rewards/, custom adapters)
-
-### Phase 3: SkyPilot Integration
-- Replace auto_optimizer with sky.yaml generation
-- Add cloud provider cost/availability logic
-- Auto-provision infra if --remote flag set
-- Document HW config workflow
-
-### Phase 4: Complexity Reduction & Docs
-- Audit from_scratch/* framework (likely 80% dead)
-- Simplify framework adapters to template-driven
-- Update workflow.md with end-to-end process
-- Add generated README to setup folders
-
----
-
-## Constraints
-- No external service dependencies (SkyPilot is optional, local-only fallback OK)
-- Minimal scaffold — goal is "start point", not "production-ready"
-- Config.yml is source of truth; Python is plumbing only
-- All plugins (techniques, frameworks) stay — they work, even if "dead" to static analysis
-
----
-
-## Definition of Done
-- [ ] All phases executed
-- [ ] `envelope setup` generates working folder for ≥1 technique + framework combo
-- [ ] Tests pass (pytest)
-- [ ] Linting passes (ruff)
-- [ ] README + workflow.md updated
-- [ ] Git history clean (atomic commits per phase)

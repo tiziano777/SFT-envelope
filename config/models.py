@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from envelope.config.defaults import HYPERPARAMETER_DEFAULTS
+
 
 # ─── Enums ───
 
@@ -397,6 +399,17 @@ class OutputConfig(BaseModel):
     hub_model_id: str | None = None
 
 
+# ─── Diagnostics Config ───
+
+
+class DiagnosticsConfig(BaseModel):
+    """Configuration for training diagnostics/callbacks."""
+
+    enabled: bool = True
+    callback_class: str = Field("TRLDiagnosticCallback", description="Callback class: TRLDiagnosticCallback, custom, or none")
+    copy_runtime: bool = Field(True, description="Copy diagnostics/runtime.py into setup dir")
+
+
 # ─── Root Config ───
 
 
@@ -414,7 +427,11 @@ class EnvelopeConfig(BaseModel):
     optimization: OptimizationConfig = Field(default_factory=OptimizationConfig)
     framework: FrameworkConfig = Field(default_factory=FrameworkConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
-    hparam_overrides: dict[str, Any] = Field(default_factory=dict, description="Hyperparameter defaults from techniques, can be overridden at runtime via HPARAM_* env vars")
+    diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    hparam_overrides: dict[str, Any] = Field(
+        default_factory=lambda: dict(HYPERPARAMETER_DEFAULTS),
+        description="Hyperparameter defaults (learning_rate, batch_size, etc.), overridable via HPARAM_* env vars"
+    )
 
     @model_validator(mode="after")
     def validate_cross_fields(self) -> EnvelopeConfig:

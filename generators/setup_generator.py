@@ -146,8 +146,9 @@ def generate_setup(
     # Copy framework-specific extra files (e.g., from_scratch lib)
     framework.extra_setup_files(config, output_dir)
 
-    # Copy runtime diagnostics module
-    _copy_diagnostics(output_dir)
+    # Copy runtime diagnostics module (if enabled in config)
+    if config.diagnostics.enabled and config.diagnostics.copy_runtime:
+        _copy_diagnostics(output_dir)
 
     # Step 16: Inject worker middleware
     inject_worker_middleware(output_dir)
